@@ -21,11 +21,50 @@ function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
 function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
 function formatTime(secs) { const m=Math.floor(secs/60); const s=secs%60; return `${m}:${s<10?'0':''}${s}`; }
 
+// Get role image path
+// Note: Download script saves files with extensions from wiki (.png, .jpg, etc.)
+// This function returns .png path - if file has different extension, it will gracefully fail
+function getRoleImage(roleId, type) {
+  if (!roleId || !type) return null;
+  // Map type to directory name (matching download script structure)
+  const typeMap = {
+    townsfolk: "townsfolk",
+    outsider: "outsiders",
+    minion: "minions",
+    demon: "demons",
+    traveller: "travellers"
+  };
+  const dir = typeMap[type] || "townsfolk";
+  // Default to .png - if download script saved with different extension,
+  // the onerror handler will hide the image gracefully
+  return `assets/images/${dir}/${roleId}.png`;
+}
+
+// Render role image with graceful fallback
+// Tries .png first, then attempts other common extensions if .png fails
+function renderRoleImage(roleId, type, size = 32, style = "") {
+  if (!roleId || !type) return "";
+  
+  const typeMap = {
+    townsfolk: "townsfolk",
+    outsider: "outsiders",
+    minion: "minions",
+    demon: "demons",
+    traveller: "travellers"
+  };
+  const dir = typeMap[type] || "townsfolk";
+  const basePath = `assets/images/${dir}/${roleId}`;
+  
+  // Simple img tag - browser will handle missing images gracefully
+  // If image doesn't exist, onerror will hide it
+  return `<img src="${basePath}.png" alt="${roleId}" style="width:${size}px;height:${size}px;object-fit:contain;${style}" onerror="this.style.display='none'">`;
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════════════════
 let state = {
-  screen: "select",       // select | count | names | characters | showroles | game
+  screen: "select",       // select | count | names | characters | travellers | showroles | game
   scriptId: null,         // "tb" | "bmr"
   playerCount: 10,
   names: [],
@@ -33,11 +72,14 @@ let state = {
 
   // Character selection
   selTF: [], selOS: [], selMN: [], selDM: [],
+  selTR: [],                 // Selected Traveller characters (IDs)
+  travellerData: [],          // Array of {character, name, alignment} for each selected Traveller
   godfatherOutsiderMod: 0, // BMR only: -1, 0, +1
   drunkAs: "",              // TB only: which TF the Drunk believes they are
 
   // Travellers
   travellersEnabled: false,
+  travellersToggle: false,  // Toggle to show/hide Travellers section
   travellers: [],            // Array of {name, character, alignment, seat, alive, exiled, notes, ...}
 
   // Game state
@@ -76,8 +118,11 @@ function autoSave() {
       screen: state.screen, scriptId: state.scriptId,
       playerCount: state.playerCount, names: state.names,
       selTF: state.selTF, selOS: state.selOS, selMN: state.selMN, selDM: state.selDM,
+      selTR: state.selTR || [], travellerData: state.travellerData || [],
       godfatherOutsiderMod: state.godfatherOutsiderMod, drunkAs: state.drunkAs,
-      travellersEnabled: state.travellersEnabled, travellers: state.travellers,
+      travellersEnabled: state.travellersEnabled ?? false,
+      travellersToggle: state.travellersToggle ?? false,
+      travellers: state.travellers || [],
       gs: state.gs, tab: state.tab, nightStep: state.nightStep,
       nightPhase: state.nightPhase, undoStack: state.undoStack,
       rolesShown: state.rolesShown, expandedTraveller: state.expandedTraveller,
@@ -104,9 +149,11 @@ function resumeGame() {
     playerCount: saved.playerCount, names: saved.names || [],
     selTF: saved.selTF || [], selOS: saved.selOS || [],
     selMN: saved.selMN || [], selDM: saved.selDM || [],
+    selTR: saved.selTR || [], travellerData: saved.travellerData || [],
     godfatherOutsiderMod: saved.godfatherOutsiderMod || 0,
     drunkAs: saved.drunkAs || "",
     travellersEnabled: saved.travellersEnabled ?? false,
+    travellersToggle: saved.travellersToggle ?? false,
     travellers: saved.travellers || [],
     gs: saved.gs, tab: saved.tab || "grimoire",
     nightStep: saved.nightStep || 0, nightPhase: saved.nightPhase || "none",
@@ -126,8 +173,9 @@ function newGame() {
     screen: "select", scriptId: null, playerCount: 10,
     names: [], nameInput: "",
     selTF: [], selOS: [], selMN: [], selDM: [],
+    selTR: [], travellerData: [],
     godfatherOutsiderMod: 0, drunkAs: "",
-    travellersEnabled: false, travellers: [],
+    travellersEnabled: false, travellersToggle: false, travellers: [],
     gs: null, tab: "grimoire", expandedPlayer: -1, expandedTraveller: -1,
     nightPhase: "none", nightStep: 0, nightStepData: {},
     undoStack: [], confirm: null,
@@ -309,9 +357,10 @@ function renderOverlays() {
     const ch = c[p.actual];
     const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
     const clr = TYPE_CLR[showCh?.type || "townsfolk"];
+    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 120, "margin-bottom:12px");
     html += `<div class="show-card-overlay" onclick="state.showingRoleFor=-1;render()">
       <div class="show-card" style="background:linear-gradient(135deg,#0d0d1a,${clr.bg});border:3px solid ${clr.bdr}">
-        <div style="font-size:64px;margin-bottom:12px">${TEMOJI[showCh?.type||"townsfolk"]}</div>
+        ${roleImg || `<div style="font-size:64px;margin-bottom:12px">${TEMOJI[showCh?.type||"townsfolk"]}</div>`}
         <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">${(showCh?.type||"").toUpperCase()}</div>
         <div style="font-size:28px;font-weight:700;color:${clr.txt};margin-bottom:16px">${showCh?.name||''}</div>
         <div style="font-size:14px;color:#ccc;line-height:1.6;padding:12px 16px;background:rgba(0,0,0,0.3);border-radius:10px">${esc(showCh?.ab||'')}</div>
@@ -497,6 +546,9 @@ function goToCharacters() {
   state.screen = "characters";
   state.selTF = []; state.selOS = []; state.selMN = [];
   state.selDM = S().demonFixed ? [...S().defaultDemon] : [];
+  state.selTR = state.selTR || [];
+  state.travellerData = state.travellerData || [];
+  state.travellersToggle = state.travellersToggle ?? false;
   state.drunkAs = ""; state.godfatherOutsiderMod = 0;
   autoSave(); render();
 }
@@ -526,26 +578,26 @@ function getAdjustedDist() {
 
 function renderCharScreen() {
   const s = S(); const c = s.C;
-  const adj = getAdjustedDist();
   const townsfolk = Object.values(c).filter(ch => ch.type === "townsfolk");
   const outsiders = Object.values(c).filter(ch => ch.type === "outsider");
   const minions = Object.values(c).filter(ch => ch.type === "minion");
   const demons = Object.values(c).filter(ch => ch.type === "demon");
+  const travellers = Object.values(s.TRAVELLERS || {});
 
-  function chipSection(title, chars, sel, key, needed) {
+  function chipSection(title, chars, sel, key) {
     const type = key === "selMN" ? "minion" : key === "selOS" ? "outsider" : key === "selDM" ? "demon" : "townsfolk";
     const clr = TYPE_CLR[type];
-    const ok = sel.length === needed;
     let chips = "";
     chars.forEach(ch => {
       const on = sel.includes(ch.id);
+      const roleImg = renderRoleImage(ch.id, type, 20, "vertical-align:middle;margin-right:4px");
       chips += `<span class="role-chip" onclick="toggleRole('${key}','${ch.id}')"
-        style="border-color:${on?clr.bdr:'#333'};background:${on?clr.bg:'rgba(0,0,0,0.3)'};color:${on?clr.txt:'#666'};font-weight:${on?600:400}">${ch.name}</span>`;
+        style="border-color:${on?clr.bdr:'#333'};background:${on?clr.bg:'rgba(0,0,0,0.3)'};color:${on?clr.txt:'#666'};font-weight:${on?600:400};display:inline-flex;align-items:center">${roleImg}${ch.name}</span>`;
     });
     return `<div style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-weight:600;color:${clr.txt};font-size:14px">${title}</span>
-        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:${ok?'rgba(39,174,96,0.2)':'rgba(231,76,60,0.2)'};color:${ok?'var(--green)':'var(--red)'}">${sel.length}/${needed}</span>
+        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(243,156,18,0.2);color:#f39c12">${sel.length}</span>
       </div>
       <div>${chips}</div>
     </div>`;
@@ -558,12 +610,12 @@ function renderCharScreen() {
     demonSection = `<div style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-weight:600;color:${clr.txt};font-size:14px">Demon</span>
-        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(39,174,96,0.2);color:var(--green)">1/1</span>
+        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(243,156,18,0.2);color:#f39c12">1</span>
       </div>
       <span class="role-chip" style="border-color:${clr.bdr};background:${clr.bg};color:${clr.txt};font-weight:600;cursor:default">Imp</span>
     </div>`;
   } else {
-    demonSection = chipSection("Demon (choose 1)", demons, state.selDM, "selDM", adj.d);
+    demonSection = chipSection("Demon", demons, state.selDM, "selDM");
   }
 
   // Drunk picker (TB only)
@@ -579,33 +631,64 @@ function renderCharScreen() {
     </div>`;
   }
 
-  // Godfather modifier (BMR only)
-  let godfatherMod = "";
-  if (state.scriptId === "bmr") {
-    const hasGF = state.selMN.includes("godfather");
-    if (hasGF) {
-      const mod = state.godfatherOutsiderMod;
-      godfatherMod = `<div class="card" style="border-color:rgba(155,89,182,0.3);background:rgba(90,26,90,0.1);margin-bottom:16px">
-        <div style="font-weight:600;font-size:13px;color:var(--purple);margin-bottom:8px">🎩 Godfather: Outsider Modifier</div>
-        <div style="display:flex;align-items:center;gap:12px;justify-content:center">
-          <button class="count-btn ${mod===-1?'active':''}" style="width:40px;height:40px;font-size:14px" onclick="state.godfatherOutsiderMod=-1;autoSave();render()">−1</button>
-          <button class="count-btn ${mod===0?'active':''}" style="width:40px;height:40px;font-size:14px" onclick="state.godfatherOutsiderMod=0;autoSave();render()">0</button>
-          <button class="count-btn ${mod===1?'active':''}" style="width:40px;height:40px;font-size:14px" onclick="state.godfatherOutsiderMod=1;autoSave();render()">+1</button>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:6px;text-align:center">Adds or removes 1 Outsider (adjusts Townsfolk accordingly)</div>
-      </div>`;
+  // Travellers toggle and section
+  let travellerSection = "";
+  if (!state.travellersToggle) {
+    // Clear Travellers if toggle is off
+    state.selTR = [];
+    state.travellerData = [];
+  } else if (travellers.length > 0) {
+    // Initialize Traveller selection state if needed
+    if (!state.selTR) state.selTR = [];
+    if (!state.travellerData) state.travellerData = [];
+    
+    // Ensure travellerData matches selTR
+    while (state.travellerData.length < state.selTR.length) {
+      state.travellerData.push({ character: state.selTR[state.travellerData.length], name: "", alignment: "good" });
     }
+    while (state.travellerData.length > state.selTR.length) {
+      state.travellerData.pop();
+    }
+    
+    let travellerChips = "";
+    travellers.forEach(tr => {
+      const on = state.selTR.includes(tr.id);
+      const travImg = renderRoleImage(tr.id, "traveller", 20, "vertical-align:middle;margin-right:4px");
+      travellerChips += `<span class="role-chip" onclick="toggleTraveller('${tr.id}')"
+        style="border-color:${on?'#f39c12':'#333'};background:${on?'rgba(243,156,18,0.15)':'rgba(0,0,0,0.3)'};color:${on?'#f39c12':'#666'};font-weight:${on?600:400};display:inline-flex;align-items:center">${travImg}${tr.name}</span>`;
+    });
+    
+    let travellerDetails = "";
+    state.travellerData.forEach((td, idx) => {
+      const travChar = travellers.find(t => t.id === td.character);
+      if (!travChar) return;
+      
+      travellerDetails += `<div class="card" style="border-color:rgba(243,156,18,0.3);background:rgba(243,156,18,0.08);margin-bottom:8px;padding:10px">
+        <div style="font-weight:600;font-size:12px;color:#f39c12;margin-bottom:6px">${travChar.name}</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <input class="input" style="flex:1;font-size:12px" placeholder="Traveller name..." value="${esc(td.name || "")}"
+            oninput="state.travellerData[${idx}].name=this.value;autoSave()">
+          <select class="input" style="width:80px;font-size:12px" onchange="state.travellerData[${idx}].alignment=this.value;autoSave()">
+            <option value="good" ${td.alignment==='good'?'selected':''}>Good</option>
+            <option value="evil" ${td.alignment==='evil'?'selected':''}>Evil</option>
+          </select>
+        </div>
+      </div>`;
+    });
+    
+    travellerSection = `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:600;color:#f39c12;font-size:14px">🧳 Travellers (Optional)</span>
+        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(243,156,18,0.2);color:#f39c12">${state.selTR.length}</span>
+      </div>
+      <div style="margin-bottom:8px">${travellerChips}</div>
+      ${travellerDetails}
+    </div>`;
   }
 
-  // Validation
+  // Validation - only require at least one demon (unless fixed)
   const hasDrunk = state.scriptId === "tb" && state.selOS.includes("drunk");
-  const canProceed = state.selTF.length === adj.t && state.selOS.length === adj.o && state.selMN.length === adj.m && state.selDM.length === adj.d && (!hasDrunk || state.drunkAs);
-
-  // Baron warning for TB
-  let baronNote = "";
-  if (state.scriptId === "tb" && state.selMN.includes("baron")) {
-    baronNote = `<div class="warn warn-orange" style="margin-bottom:12px">👑 Baron: +2 Outsiders, −2 Townsfolk</div>`;
-  }
+  const canProceed = (s.demonFixed || state.selDM.length > 0) && (!hasDrunk || state.drunkAs);
 
   return `<div class="screen${state._fadeIn?' fade-in':''}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -615,18 +698,25 @@ function renderCharScreen() {
       </div>
       <button class="btn-outline" onclick="state.screen='names';render()">← Back</button>
     </div>
-    <button class="btn btn-blue" style="margin-bottom:16px;font-size:13px" onclick="randomizeRoles()">🎲 Randomize All</button>
-    ${baronNote}
-    ${chipSection("Townsfolk", townsfolk, state.selTF, "selTF", adj.t)}
-    ${chipSection("Outsiders", outsiders, state.selOS, "selOS", adj.o)}
-    ${chipSection("Minions", minions, state.selMN, "selMN", adj.m)}
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+      <button class="btn btn-blue" style="flex:1;font-size:13px" onclick="randomizeRoles()">🎲 Randomize All</button>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:13px;color:var(--text2)" onclick="state.travellersToggle=!state.travellersToggle;autoSave();render()">
+        <span>🧳 Travellers</span>
+        <div style="position:relative;width:40px;height:20px;background:${state.travellersToggle?'#f39c12':'#444'};border-radius:10px;transition:background 0.2s;cursor:pointer">
+          <div style="position:absolute;top:2px;left:${state.travellersToggle?'22px':'2px'};width:16px;height:16px;background:#fff;border-radius:50%;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
+        </div>
+      </label>
+    </div>
+    ${chipSection("Townsfolk", townsfolk, state.selTF, "selTF")}
+    ${chipSection("Outsiders", outsiders, state.selOS, "selOS")}
+    ${chipSection("Minions", minions, state.selMN, "selMN")}
     ${demonSection}
     ${drunkPicker}
-    ${godfatherMod}
+    ${travellerSection}
     <button class="btn ${canProceed?'btn-primary':'btn-disabled'}" ${canProceed?"":'disabled'}
       style="${canProceed?'background:'+s.color:''}"
       onclick="assignAndShowRoles()">
-      ${canProceed?"🎭 Assign Roles & Start":"Select correct number of each type"}
+      ${canProceed?"🎭 Assign Roles & Start":(hasDrunk && !state.drunkAs ? "Select Drunk's false role" : "Select at least one Demon")}
     </button>
   </div>`;
 }
@@ -649,37 +739,109 @@ function toggleRole(key, id) {
 
 function randomizeRoles() {
   const s = S(); const c = s.C;
-  const base = s.DIST[state.playerCount];
+  const playerCount = state.playerCount || 0;
 
   const allTF = Object.values(c).filter(ch => ch.type === "townsfolk").map(ch => ch.id);
   const allOS = Object.values(c).filter(ch => ch.type === "outsider").map(ch => ch.id);
   const allMN = Object.values(c).filter(ch => ch.type === "minion").map(ch => ch.id);
   const allDM = Object.values(c).filter(ch => ch.type === "demon").map(ch => ch.id);
+  const allTR = state.travellersToggle ? Object.values(s.TRAVELLERS || {}).map(ch => ch.id) : [];
 
-  // Pick demon first
+  // Calculate how many roles we need
+  let rolesNeeded = playerCount;
+  let travellerCount = 0;
+  
+  // If Travellers toggle is on, randomly select some Travellers
+  if (state.travellersToggle && allTR.length > 0 && playerCount > 1) {
+    // Randomly select 0-3 Travellers (or up to 1/3 of players, but leave at least 2 roles for regular players)
+    const maxTravellers = Math.min(3, Math.max(0, Math.floor(playerCount / 3)), allTR.length, playerCount - 2);
+    travellerCount = Math.floor(Math.random() * (maxTravellers + 1));
+    rolesNeeded -= travellerCount;
+  }
+
+  // Pick demon first - at least one required
   let selDM;
   if (s.demonFixed) {
     selDM = [...s.defaultDemon];
+    rolesNeeded -= selDM.length;
   } else {
-    // BMR: keep current demon if one selected, else random
-    selDM = state.selDM.length === 1 ? [...state.selDM] : [shuffle(allDM)[0]];
+    // Select 1 demon (required)
+    selDM = [shuffle(allDM)[0]];
+    rolesNeeded -= 1;
   }
 
-  // Pick minions
-  const selMN = shuffle(allMN).slice(0, base.m);
+  // Ensure we have enough roles left for at least some Townsfolk
+  rolesNeeded = Math.max(1, rolesNeeded);
 
-  // Calculate modifiers
-  let oMod = 0, tMod = 0;
-  if (state.scriptId === "tb" && selMN.includes("baron")) {
-    oMod = 2; tMod = -2;
-  } else if (state.scriptId === "bmr" && selMN.includes("godfather")) {
-    const mod = [-1, 0, 1][Math.floor(Math.random() * 3)];
-    state.godfatherOutsiderMod = mod;
-    oMod = mod; tMod = -mod;
+  // Distribute remaining roles randomly among TF, OS, MN
+  // Ensure we have at least some Townsfolk for balance
+  const minTownsfolk = Math.max(1, Math.floor(rolesNeeded * 0.4));
+  const maxTownsfolk = Math.min(allTF.length, Math.floor(rolesNeeded * 0.7));
+  const townsfolkCount = Math.floor(Math.random() * (maxTownsfolk - minTownsfolk + 1)) + minTownsfolk;
+  rolesNeeded -= townsfolkCount;
+
+  // Remaining roles split between Outsiders and Minions
+  const remainingRoles = Math.max(0, rolesNeeded);
+  const minionCount = Math.floor(Math.random() * (remainingRoles + 1));
+  const outsiderCount = remainingRoles - minionCount;
+
+  let selTF = shuffle(allTF).slice(0, Math.min(townsfolkCount, allTF.length));
+  let selMN = shuffle(allMN).slice(0, Math.min(minionCount, allMN.length));
+  let selOS = shuffle(allOS).slice(0, Math.min(outsiderCount, allOS.length));
+
+  // Calculate current total and adjust to match playerCount exactly
+  let totalSelected = selTF.length + selOS.length + selMN.length + selDM.length + travellerCount;
+  let stillNeeded = playerCount - totalSelected;
+  
+  // Fill remaining roles with Townsfolk first, then Outsiders, then Minions
+  if (stillNeeded > 0) {
+    const remainingTF = allTF.filter(id => !selTF.includes(id));
+    const remainingOS = allOS.filter(id => !selOS.includes(id));
+    const remainingMN = allMN.filter(id => !selMN.includes(id));
+    
+    const addTF = Math.min(stillNeeded, remainingTF.length);
+    selTF.push(...shuffle(remainingTF).slice(0, addTF));
+    stillNeeded -= addTF;
+    
+    if (stillNeeded > 0) {
+      const addOS = Math.min(stillNeeded, remainingOS.length);
+      selOS.push(...shuffle(remainingOS).slice(0, addOS));
+      stillNeeded -= addOS;
+    }
+    
+    if (stillNeeded > 0) {
+      const addMN = Math.min(stillNeeded, remainingMN.length);
+      selMN.push(...shuffle(remainingMN).slice(0, addMN));
+      stillNeeded -= addMN;
+    }
+  } else if (stillNeeded < 0) {
+    // Too many roles selected, remove excess (prefer removing from TF, then OS, then MN)
+    let toRemove = -stillNeeded;
+    while (toRemove > 0 && selTF.length > 1) {
+      selTF.pop();
+      toRemove--;
+    }
+    while (toRemove > 0 && selOS.length > 0) {
+      selOS.pop();
+      toRemove--;
+    }
+    while (toRemove > 0 && selMN.length > 0) {
+      selMN.pop();
+      toRemove--;
+    }
   }
 
-  const selOS = shuffle(allOS).slice(0, base.o + oMod);
-  const selTF = shuffle(allTF).slice(0, base.t + tMod);
+  // Select Travellers if toggle is on
+  let selTR = [];
+  let travellerData = [];
+  if (state.travellersToggle && travellerCount > 0 && allTR.length > 0) {
+    selTR = shuffle(allTR).slice(0, Math.min(travellerCount, allTR.length));
+    travellerData = selTR.map(charId => ({
+      character: charId,
+      name: "",
+      alignment: Math.random() > 0.5 ? "good" : "evil"
+    }));
+  }
 
   // Drunk-believes-as for TB
   let drunkAs = "";
@@ -688,9 +850,127 @@ function randomizeRoles() {
     if (remaining.length > 0) drunkAs = shuffle(remaining)[0];
   }
 
-  state.selTF = selTF; state.selOS = selOS; state.selMN = selMN; state.selDM = selDM;
+  state.selTF = selTF; 
+  state.selOS = selOS; 
+  state.selMN = selMN; 
+  state.selDM = selDM;
+  state.selTR = selTR;
+  state.travellerData = travellerData;
   state.drunkAs = drunkAs;
+  state.godfatherOutsiderMod = 0;
   autoSave(); render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ROLE ASSIGNMENT + GAME STATE CREATION
+// ══════════════════════════════════════════════════════════════════════════
+function goToTravellers() {
+  state.screen = "travellers";
+  // Initialize travellers array if not already set
+  if (!state.travellers) {
+    state.travellers = [];
+  }
+  autoSave();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SCREEN: Travellers Selection
+// ══════════════════════════════════════════════════════════════════════════
+function renderTravellersScreen() {
+  const s = S();
+  const travellers = s.TRAVELLERS || {};
+  const travellerList = Object.values(travellers);
+  
+  let travellerCards = "";
+  if (state.travellers && state.travellers.length > 0) {
+    state.travellers.forEach((t, i) => {
+      const travChar = travellers[t.character];
+      const alignmentColor = t.alignment === "good" ? "#5dade2" : "#e74c3c";
+      const travImg = renderRoleImage(t.character, "traveller", 40, "margin-right:8px");
+      
+      travellerCards += `<div class="card" style="border-color:rgba(243,156,18,0.3);background:rgba(243,156,18,0.08);margin-bottom:8px;display:flex;align-items:center;gap:10px">
+        ${travImg}
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px;color:var(--text)">${esc(t.name)}</div>
+          <div style="font-size:11px;color:#f39c12">${travChar?.name || t.character}</div>
+          <div style="font-size:11px;color:${alignmentColor}">${t.alignment === "good" ? "Good" : "Evil"}</div>
+        </div>
+        <button class="btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);border-color:var(--red)" onclick="removeTravellerSetup(${i})">✕</button>
+      </div>`;
+    });
+  } else {
+    travellerCards = `<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">No Travellers added yet</div>`;
+  }
+  
+  return `<div class="screen${state._fadeIn?' fade-in':''}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <h2 style="font-size:18px;color:${s.color}">🧳 Travellers</h2>
+        <p style="color:var(--text2);font-size:12px">Optional: Add Travellers for late joiners or early leavers</p>
+      </div>
+      <button class="btn-outline" onclick="state.screen='characters';render()">← Back</button>
+    </div>
+    
+    <div style="margin-bottom:16px">
+      <button class="btn-outline" style="width:100%;color:#f39c12;border-color:rgba(243,156,18,0.3);margin-bottom:12px" onclick="addTravellerSetup()">+ Add Traveller</button>
+      ${travellerCards}
+    </div>
+    
+    <button class="btn btn-primary" style="background:${s.color};width:100%" onclick="assignAndShowRoles()">
+      🎭 Assign Roles & Start
+    </button>
+  </div>`;
+}
+
+function addTravellerSetup() {
+  const s = S();
+  const travellers = s.TRAVELLERS || {};
+  const travellerList = Object.values(travellers);
+  
+  if (travellerList.length === 0) {
+    alert("No Travellers available for this script.");
+    return;
+  }
+  
+  const name = prompt("Enter Traveller name:");
+  if (!name || !name.trim()) return;
+  
+  let charList = travellerList.map((t, i) => `${i+1}. ${t.name}`).join("\n");
+  const charId = prompt(`Select Traveller character:\n${charList}\n\nEnter number (1-${travellerList.length}):`);
+  if (!charId) return;
+  
+  const charIdx = parseInt(charId) - 1;
+  if (charIdx < 0 || charIdx >= travellerList.length) {
+    alert("Invalid selection.");
+    return;
+  }
+  
+  const selectedChar = travellerList[charIdx];
+  const alignment = confirm("Is this Traveller Good? (OK = Good, Cancel = Evil)") ? "good" : "evil";
+  
+  const maxSeat = Math.max(...(state.travellers || []).map(t => t.seat || 0), state.playerCount || 0);
+  const newTraveller = {
+    name: name.trim(),
+    character: selectedChar.id,
+    alignment: alignment,
+    seat: maxSeat + 1,
+    alive: true,
+    exiled: false,
+    notes: "",
+  };
+  
+  state.travellers = [...(state.travellers || []), newTraveller];
+  autoSave();
+  render();
+}
+
+function removeTravellerSetup(i) {
+  if (confirm(`Remove Traveller "${state.travellers[i].name}"?`)) {
+    state.travellers.splice(i, 1);
+    autoSave();
+    render();
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -699,6 +979,28 @@ function randomizeRoles() {
 function assignAndShowRoles() {
   const s = S(); const c = s.C;
   const hasDrunk = state.scriptId === "tb" && state.selOS.includes("drunk");
+  
+  // Build Travellers from travellerData
+  state.travellers = [];
+  if (state.travellerData && state.travellerData.length > 0) {
+    state.travellersEnabled = true;
+    const maxSeat = state.playerCount || 0;
+    state.travellerData.forEach((td, idx) => {
+      if (td.character && td.name && td.name.trim()) {
+        state.travellers.push({
+          name: td.name.trim(),
+          character: td.character,
+          alignment: td.alignment || "good",
+          seat: maxSeat + idx + 1,
+          alive: true,
+          exiled: false,
+          notes: "",
+        });
+      }
+    });
+  } else {
+    state.travellersEnabled = false;
+  }
 
   // Build role pool
   const pool = [...state.selTF, ...state.selOS.filter(id => id !== "drunk"), ...state.selMN, ...state.selDM];
@@ -778,6 +1080,7 @@ function assignAndShowRoles() {
   state.screen = "showroles";
   state.tab = "grimoire";
   state.expandedPlayer = -1;
+  state.expandedTraveller = -1;
   state.nightStep = 0;
   state.showingRoleFor = -1;
   state.showCard = null;
@@ -832,8 +1135,10 @@ function renderShowRolesScreen() {
     const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
     const clr = TYPE_CLR[showCh?.type || "townsfolk"];
     const shown = state.rolesShown.includes(i);
+    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 28);
     html += `<div onclick="showRoleTo(${i})" style="padding:12px;margin-bottom:6px;border-radius:10px;border:1px solid ${clr.bdr}44;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:10px;${shown?'opacity:0.6':''}">
       <span class="seat-num" style="background:${clr.bdr}">${i+1}</span>
+      ${roleImg}
       <span style="flex:1;font-weight:600;font-size:14px">${esc(p.name)}</span>
       <span style="font-size:20px">${TEMOJI[showCh?.type||"townsfolk"]}</span>
       <span style="color:var(--text3);font-size:14px">${shown?"✓":"👁️"}</span>
@@ -1095,9 +1400,11 @@ function renderGrimoire() {
       </div>`;
     }
 
+    const roleImg = renderRoleImage(ch?.id, ch?.type, 32, "margin-right:8px;flex-shrink:0");
     html += `<div class="player-row" style="border-color:${p.alive ? clr.bdr+'44' : '#222'};background:${p.alive ? clr.bg : 'rgba(20,20,20,0.5)'};opacity:${p.alive?1:0.55}">
       <div class="player-main" onclick="state.expandedPlayer=${isExp?-1:i};render()">
         <span class="seat-num" style="background:${p.alive?clr.bdr:'#444'}">${i+1}</span>
+        ${roleImg}
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:14px;color:${p.alive?'var(--text)':'#666'};${p.alive?'':'text-decoration:line-through'}">
             ${esc(p.name)}${!p.alive&&p.ghostVote&&!p.ghostUsed?' 👻':''}${p.ghostUsed?' 💀':''}
@@ -1135,7 +1442,9 @@ function renderGrimoire() {
           actions += `<button class="btn-sm" style="background:rgba(39,174,96,0.12);color:var(--green)" onclick="unexileTraveller(${i})">✨ Return</button> `;
         }
         
+        const travExpandedImg = renderRoleImage(t.character, "traveller", 48, "margin-bottom:8px");
         expanded = `<div class="player-expand">
+          ${travExpandedImg ? `<div style="text-align:center;margin-bottom:8px">${travExpandedImg}</div>` : ""}
           <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;line-height:1.4">
             <strong style="color:${alignmentColor}">Alignment:</strong> ${t.alignment === "good" ? "Good" : "Evil"}<br>
             ${travChar ? `<strong>Ability:</strong> ${esc(travChar.ab)}` : ""}
@@ -1149,9 +1458,11 @@ function renderGrimoire() {
         </div>`;
       }
       
+      const travImg = renderRoleImage(t.character, "traveller", 32, "margin-right:8px;flex-shrink:0");
       html += `<div class="player-row" style="border-color:${t.exiled ? '#222' : 'rgba(243,156,18,0.4)'};background:${t.exiled ? 'rgba(20,20,20,0.5)' : 'rgba(243,156,18,0.08)'};opacity:${t.exiled?0.55:1}">
         <div class="player-main" onclick="state.expandedTraveller=${isExp?-1:i};render()">
           <span class="seat-num" style="background:${t.exiled ? '#444' : '#f39c12'}">T${i+1}</span>
+          ${travImg}
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:14px;color:${t.exiled?'#666':'var(--text)'};${t.exiled?'text-decoration:line-through':''}">
               ${esc(t.name)} ${t.exiled ? '🚫' : ''}
@@ -3243,8 +3554,10 @@ function renderRolesRef() {
     const ch = c[p.actual];
     const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
     const clr = TYPE_CLR[showCh?.type || ch?.type || "townsfolk"];
+    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 24);
     html += `<div onclick="state.showingRoleFor=${i};render()" style="padding:10px 12px;margin-bottom:5px;border-radius:8px;border:1px solid ${clr.bdr}44;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:8px">
       <span class="seat-num" style="background:${clr.bdr}">${i+1}</span>
+      ${roleImg}
       <span style="flex:1;font-weight:600;font-size:13px">${esc(p.name)}</span>
       <span style="font-size:16px">${TEMOJI[showCh?.type||"townsfolk"]}</span>
       <span style="color:var(--text3);font-size:12px">👁️</span>
@@ -3257,8 +3570,9 @@ function renderRolesRef() {
     const clr = TYPE_CLR[type];
     html += `<div style="font-weight:600;font-size:12px;color:${clr.txt};margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">${TEMOJI[type]} ${type}s</div>`;
     Object.values(c).filter(ch => ch.type === type).forEach(ch => {
-      html += `<div style="padding:6px 10px;margin-bottom:3px;border-radius:6px;background:rgba(255,255,255,0.02);font-size:11px;line-height:1.4">
-        <strong style="color:${clr.txt}">${ch.name}:</strong> <span style="color:var(--text2)">${esc(ch.ab)}</span>
+      const roleImg = renderRoleImage(ch.id, type, 20, "vertical-align:middle;margin-right:6px");
+      html += `<div style="padding:6px 10px;margin-bottom:3px;border-radius:6px;background:rgba(255,255,255,0.02);font-size:11px;line-height:1.4;display:flex;align-items:center;gap:6px">
+        ${roleImg}<div><strong style="color:${clr.txt}">${ch.name}:</strong> <span style="color:var(--text2)">${esc(ch.ab)}</span></div>
       </div>`;
     });
     html += '<div style="height:8px"></div>';
