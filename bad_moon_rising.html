@@ -17,8 +17,8 @@
 // Initialize script after all scripts load
 (function() {
   try {
-    // Verify required objects are loaded
-    if (typeof state === 'undefined' || typeof TB === 'undefined' || typeof BMR === 'undefined') {
+    // Verify required objects and functions are loaded
+    if (typeof state === 'undefined' || typeof TB === 'undefined' || typeof BMR === 'undefined' || typeof S === 'undefined') {
       throw new Error('Required scripts not loaded properly');
     }
     
@@ -29,17 +29,46 @@
     // Check for saved game
     const saved = loadFromStorage();
     if (saved && saved._saved && saved.scriptId === "bmr") {
-      // Use the resumeGame function to restore state
-      resumeGame();
+      // Restore saved state manually (don't use resumeGame as it calls render immediately)
+      Object.assign(state, {
+        screen: saved.screen || "count",
+        playerCount: saved.playerCount || 10,
+        names: saved.names || [],
+        selTF: saved.selTF || [],
+        selOS: saved.selOS || [],
+        selMN: saved.selMN || [],
+        selDM: saved.selDM || [],
+        selTR: saved.selTR || [],
+        travellerData: saved.travellerData || [],
+        godfatherOutsiderMod: saved.godfatherOutsiderMod || 0,
+        drunkAs: saved.drunkAs || "",
+        travellersEnabled: saved.travellersEnabled ?? false,
+        travellersToggle: saved.travellersToggle ?? false,
+        travellers: saved.travellers || [],
+        gs: saved.gs,
+        tab: saved.tab || "grimoire",
+        nightStep: saved.nightStep || 0,
+        nightPhase: saved.nightPhase || "none",
+        undoStack: saved.undoStack || [],
+        rolesShown: saved.rolesShown || [],
+        expandedPlayer: -1,
+        expandedTraveller: saved.expandedTraveller ?? -1,
+        confirm: null,
+        showCard: null,
+        showingRoleFor: -1,
+        timer: saved.timer || null,
+      });
+      state.showResume = false;
     } else {
       // Start at count screen if no saved game
       state.screen = "count";
-      // Ensure render function exists before calling
-      if (typeof render === 'function') {
-        render();
-      } else {
-        throw new Error('Render function not available');
-      }
+    }
+    
+    // Render after everything is set up
+    if (typeof render === 'function') {
+      render();
+    } else {
+      throw new Error('Render function not available');
     }
   } catch (error) {
     console.error("Initialization error:", error);

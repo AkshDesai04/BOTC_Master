@@ -169,6 +169,35 @@ const BMR_OTHER_NIGHT = [
   {id:"_goon",            order:18, title:"🔄 Goon (passive)"},
 ];
 
+// Travellers for Bad Moon Rising
+const BMR_TRAVELLERS = {
+  apprentice: {
+    id: "apprentice", name: "Apprentice", team: "traveller", type: "traveller",
+    ab: "On your 1st night, you gain a Townsfolk ability (if good), or a Minion ability (if evil).",
+    script: "bmr"
+  },
+  matron: {
+    id: "matron", name: "Matron", team: "traveller", type: "traveller",
+    ab: "Players may not leave their seats to talk in private. Each day, you may choose up to 3 sets of 2 players to swap seats.",
+    script: "bmr"
+  },
+  voudon: {
+    id: "voudon", name: "Voudon", team: "traveller", type: "traveller",
+    ab: "Only you & the dead can vote. They don't need a vote token to do so. A 50% majority is not required.",
+    script: "bmr"
+  },
+  judge: {
+    id: "judge", name: "Judge", team: "traveller", type: "traveller",
+    ab: "Once per game, if another player nominated, you may choose to force the current execution to pass or fail.",
+    script: "bmr"
+  },
+  bishop: {
+    id: "bishop", name: "Bishop", team: "traveller", type: "traveller",
+    ab: "Only the Storyteller can nominate. At least 1 opposing player must be nominated each day.",
+    script: "bmr"
+  },
+};
+
 const BMR = {
   id: "bmr",
   name: "Bad Moon Rising",
@@ -183,4 +212,5 @@ const BMR = {
   demonFixed: false,      // Choose from 4 demons
   defaultDemon: [],
   hasDrunk: false,
+  TRAVELLERS: BMR_TRAVELLERS,
 };
