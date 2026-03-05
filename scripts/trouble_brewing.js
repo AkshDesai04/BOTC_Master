@@ -87,6 +87,35 @@ const TB_OTHER_NIGHT = [
   {id:"undertaker",order:51},{id:"empath",order:52},{id:"fortuneteller",order:53},{id:"butler",order:54},
 ];
 
+// Travellers for Trouble Brewing
+const TB_TRAVELLERS = {
+  scapegoat: {
+    id: "scapegoat", name: "Scapegoat", team: "traveller", type: "traveller",
+    ab: "If a player of your alignment is executed, you might be executed instead.",
+    script: "tb"
+  },
+  gunslinger: {
+    id: "gunslinger", name: "Gunslinger", team: "traveller", type: "traveller",
+    ab: "Each day, after the 1st vote has been tallied, you may choose a player that voted: they die.",
+    script: "tb"
+  },
+  beggar: {
+    id: "beggar", name: "Beggar", team: "traveller", type: "traveller",
+    ab: "You must use a vote token to vote. If a dead player gives you theirs, you learn their alignment. You are sober & healthy.",
+    script: "tb"
+  },
+  bureaucrat: {
+    id: "bureaucrat", name: "Bureaucrat", team: "traveller", type: "traveller",
+    ab: "Each night, choose a player (not yourself): their vote counts as 3 votes tomorrow.",
+    script: "tb"
+  },
+  thief: {
+    id: "thief", name: "Thief", team: "traveller", type: "traveller",
+    ab: "Each night, choose a player (not yourself): their vote counts negatively tomorrow.",
+    script: "tb"
+  },
+};
+
 const TB = {
   id: "tb",
   name: "Trouble Brewing",
@@ -101,4 +130,5 @@ const TB = {
   demonFixed: true,       // Imp is the only demon
   defaultDemon: ["imp"],
   hasDrunk: true,         // Needs Drunk-believes-as picker
+  TRAVELLERS: TB_TRAVELLERS,
 };

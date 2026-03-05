@@ -36,12 +36,17 @@ let state = {
   godfatherOutsiderMod: 0, // BMR only: -1, 0, +1
   drunkAs: "",              // TB only: which TF the Drunk believes they are
 
+  // Travellers
+  travellersEnabled: false,
+  travellers: [],            // Array of {name, character, alignment, seat, alive, exiled, notes, ...}
+
   // Game state
   gs: null,
 
   // UI state
   tab: "grimoire",
   expandedPlayer: -1,
+  expandedTraveller: -1,
   nightPhase: "none",
   nightStep: 0,
   nightStepData: {},
@@ -72,9 +77,10 @@ function autoSave() {
       playerCount: state.playerCount, names: state.names,
       selTF: state.selTF, selOS: state.selOS, selMN: state.selMN, selDM: state.selDM,
       godfatherOutsiderMod: state.godfatherOutsiderMod, drunkAs: state.drunkAs,
+      travellersEnabled: state.travellersEnabled, travellers: state.travellers,
       gs: state.gs, tab: state.tab, nightStep: state.nightStep,
       nightPhase: state.nightPhase, undoStack: state.undoStack,
-      rolesShown: state.rolesShown,
+      rolesShown: state.rolesShown, expandedTraveller: state.expandedTraveller,
     }));
   } catch(e) {}
 }
@@ -100,11 +106,14 @@ function resumeGame() {
     selMN: saved.selMN || [], selDM: saved.selDM || [],
     godfatherOutsiderMod: saved.godfatherOutsiderMod || 0,
     drunkAs: saved.drunkAs || "",
+    travellersEnabled: saved.travellersEnabled ?? false,
+    travellers: saved.travellers || [],
     gs: saved.gs, tab: saved.tab || "grimoire",
     nightStep: saved.nightStep || 0, nightPhase: saved.nightPhase || "none",
     undoStack: saved.undoStack || [],
     rolesShown: saved.rolesShown || [],
-    expandedPlayer: -1, confirm: null, showCard: null, showingRoleFor: -1,
+    expandedPlayer: -1, expandedTraveller: saved.expandedTraveller ?? -1,
+    confirm: null, showCard: null, showingRoleFor: -1,
     timer: null,
   });
   state.showResume = false;
@@ -118,7 +127,8 @@ function newGame() {
     names: [], nameInput: "",
     selTF: [], selOS: [], selMN: [], selDM: [],
     godfatherOutsiderMod: 0, drunkAs: "",
-    gs: null, tab: "grimoire", expandedPlayer: -1,
+    travellersEnabled: false, travellers: [],
+    gs: null, tab: "grimoire", expandedPlayer: -1, expandedTraveller: -1,
     nightPhase: "none", nightStep: 0, nightStepData: {},
     undoStack: [], confirm: null,
     showingRoleFor: -1, showCard: null, rolesShown: [],
@@ -760,6 +770,7 @@ function assignAndShowRoles() {
     players, phase: "night", dayNum: 1, isFirstNight: true,
     executedToday: null, diedTonight: [], bluffs,
     log: [], nightKillDone: false,
+    exiledToday: null, // For Travellers
     ...extra,
   };
 
@@ -931,6 +942,7 @@ function startDay() {
   const gs = state.gs;
   gs.phase = "day";
   gs.executedToday = null;
+  gs.exiledToday = null;
   gs.nightKillDone = false;
   gs.isFirstNight = false;
   if (state.scriptId === "bmr") {
@@ -1103,6 +1115,73 @@ function renderGrimoire() {
       ${expanded}
     </div>`;
   });
+
+  // Travellers section
+  if (state.travellersEnabled && state.travellers.length > 0) {
+    html += `<div style="margin-top:16px;padding-top:16px;border-top:2px solid rgba(255,255,255,0.1)">
+      <div style="font-weight:600;font-size:13px;color:var(--text2);margin-bottom:8px">🧳 Travellers</div>`;
+    
+    state.travellers.forEach((t, i) => {
+      const travChar = s.TRAVELLERS?.[t.character];
+      const isExp = state.expandedTraveller === i;
+      const alignmentColor = t.alignment === "good" ? "#5dade2" : "#e74c3c";
+      
+      let expanded = "";
+      if (isExp) {
+        let actions = "";
+        if (t.alive && !t.exiled) {
+          if (isDay && gs.exiledToday === null) {
+            actions += `<button class="btn-sm" style="background:rgba(243,156,18,0.12);color:var(--orange)" onclick="exileTraveller(${i})">🚫 Exile</button> `;
+          }
+        } else if (t.exiled) {
+          actions += `<button class="btn-sm" style="background:rgba(39,174,96,0.12);color:var(--green)" onclick="unexileTraveller(${i})">✨ Return</button> `;
+        }
+        
+        expanded = `<div class="player-expand">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;line-height:1.4">
+            <strong style="color:${alignmentColor}">Alignment:</strong> ${t.alignment === "good" ? "Good" : "Evil"}<br>
+            ${travChar ? `<strong>Ability:</strong> ${esc(travChar.ab)}` : ""}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            ${actions}
+            <button class="btn-sm" style="background:rgba(231,76,60,0.12);color:var(--red)" onclick="removeTraveller(${i})">✕ Remove</button>
+          </div>
+          <textarea class="input" style="font-size:11px;min-height:36px;resize:vertical" placeholder="Notes..."
+            oninput="state.travellers[${i}].notes=this.value">${esc(t.notes ?? "")}</textarea>
+        </div>`;
+      }
+      
+      html += `<div class="player-row" style="border-color:${t.exiled ? '#222' : 'rgba(243,156,18,0.4)'};background:${t.exiled ? 'rgba(20,20,20,0.5)' : 'rgba(243,156,18,0.08)'};opacity:${t.exiled?0.55:1}">
+        <div class="player-main" onclick="state.expandedTraveller=${isExp?-1:i};render()">
+          <span class="seat-num" style="background:${t.exiled ? '#444' : '#f39c12'}">T${i+1}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:14px;color:${t.exiled?'#666':'var(--text)'};${t.exiled?'text-decoration:line-through':''}">
+              ${esc(t.name)} ${t.exiled ? '🚫' : ''}
+            </div>
+            <div style="font-size:11px;color:#f39c12;margin-top:1px">
+              ${travChar?.name || t.character || "Unknown"}
+              <span style="color:${alignmentColor};margin-left:6px">(${t.alignment === "good" ? "Good" : "Evil"})</span>
+            </div>
+          </div>
+          <span style="color:var(--text3);font-size:14px">${isExp?"▲":"▼"}</span>
+        </div>
+        ${expanded}
+      </div>`;
+    });
+    
+    html += `</div>`;
+  }
+  
+  // Add Traveller button
+  if (state.travellersEnabled) {
+    html += `<div style="margin-top:12px">
+      <button class="btn-outline" style="width:100%;color:#f39c12;border-color:rgba(243,156,18,0.3)" onclick="showAddTraveller()">+ Add Traveller</button>
+    </div>`;
+  } else {
+    html += `<div style="margin-top:12px">
+      <button class="btn-outline" style="width:100%;color:#f39c12;border-color:rgba(243,156,18,0.3)" onclick="enableTravellers()">🧳 Enable Travellers</button>
+    </div>`;
+  }
 
   html += `</div>`;
   return html;
@@ -1618,6 +1697,96 @@ function executePlayer(i) {
 
 function togglePoison(i) { state.gs.players[i].poisoned = !state.gs.players[i].poisoned; autoSave(); render(); }
 function toggleProtect(i) { state.gs.players[i].protected = !state.gs.players[i].protected; autoSave(); render(); }
+
+// ══════════════════════════════════════════════════════════════════════════
+// TRAVELLER MANAGEMENT
+// ══════════════════════════════════════════════════════════════════════════
+function enableTravellers() {
+  state.travellersEnabled = true;
+  state.travellers = state.travellers || [];
+  autoSave();
+  render();
+}
+
+function showAddTraveller() {
+  const s = S();
+  const travellers = s.TRAVELLERS || {};
+  const travellerList = Object.values(travellers);
+  
+  if (travellerList.length === 0) {
+    alert("No Travellers available for this script.");
+    return;
+  }
+  
+  const name = prompt("Enter Traveller name:");
+  if (!name || !name.trim()) return;
+  
+  let charList = travellerList.map((t, i) => `${i+1}. ${t.name}`).join("\n");
+  const charId = prompt(`Select Traveller character:\n${charList}\n\nEnter number (1-${travellerList.length}):`);
+  if (!charId) return;
+  
+  const charIdx = parseInt(charId) - 1;
+  if (charIdx < 0 || charIdx >= travellerList.length) {
+    alert("Invalid selection.");
+    return;
+  }
+  
+  const selectedChar = travellerList[charIdx];
+  const alignment = confirm("Is this Traveller Good? (OK = Good, Cancel = Evil)") ? "good" : "evil";
+  
+  const maxSeat = Math.max(...(state.travellers || []).map(t => t.seat || 0), state.gs?.players?.length || 0);
+  const newTraveller = {
+    name: name.trim(),
+    character: selectedChar.id,
+    alignment: alignment,
+    seat: maxSeat + 1,
+    alive: true,
+    exiled: false,
+    notes: "",
+  };
+  
+  state.travellers = [...(state.travellers || []), newTraveller];
+  autoSave();
+  render();
+}
+
+function removeTraveller(i) {
+  if (confirm(`Remove Traveller "${state.travellers[i].name}"?`)) {
+    state.travellers.splice(i, 1);
+    if (state.expandedTraveller === i) state.expandedTraveller = -1;
+    else if (state.expandedTraveller > i) state.expandedTraveller--;
+    autoSave();
+    render();
+  }
+}
+
+function exileTraveller(i) {
+  pushUndo();
+  const t = state.travellers[i];
+  const gs = state.gs;
+  
+  t.exiled = true;
+  t.alive = false;
+  gs.exiledToday = i;
+  gs.log.push(`Day ${gs.dayNum}: ${t.name} (${t.character}) exiled.`);
+  
+  autoSave();
+  render();
+}
+
+function unexileTraveller(i) {
+  pushUndo();
+  const t = state.travellers[i];
+  const gs = state.gs;
+  
+  t.exiled = false;
+  t.alive = true;
+  if (gs.exiledToday === i) gs.exiledToday = null;
+  gs.log.push(`Day ${gs.dayNum}: ${t.name} returns from exile.`);
+  
+  autoSave();
+  render();
+}
 function revivePlayer(i) {
   pushUndo();
   const gs = state.gs;
@@ -1714,6 +1883,7 @@ function renderDayPhase() {
     <div class="card" style="font-size:13px;margin-bottom:12px">
       <div>👤 <strong>${alive}</strong> alive — need <strong style="color:var(--orange)">${majority}</strong> votes to execute</div>
       ${gs.executedToday !== null ? `<div style="margin-top:4px;color:var(--red)">⚖️ Executed today: ${gs.players[gs.executedToday]?.name}</div>` : '<div style="margin-top:4px;color:var(--text3)">No execution yet</div>'}
+      ${gs.exiledToday !== null && state.travellers?.[gs.exiledToday] ? `<div style="margin-top:4px;color:#f39c12">🚫 Exiled today: ${state.travellers[gs.exiledToday]?.name}</div>` : ''}
     </div>`;
 
   // BMR warnings
