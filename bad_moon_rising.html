@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🌙 Bad Moon Rising - BOTC Storyteller</title>
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="scripts/trouble_brewing.js"></script>
+<script src="scripts/bad_moon_rising.js"></script>
+<script src="scripts/common.js"></script>
+<script>
+// Initialize script after all scripts load
+(function() {
+  try {
+    // Verify required objects are loaded
+    if (typeof state === 'undefined' || typeof TB === 'undefined' || typeof BMR === 'undefined') {
+      throw new Error('Required scripts not loaded properly');
+    }
+    
+    // Set script ID and default demon selection
+    state.scriptId = "bmr";
+    state.selDM = BMR.demonFixed ? [...BMR.defaultDemon] : [];
+    
+    // Check for saved game
+    const saved = loadFromStorage();
+    if (saved && saved._saved && saved.scriptId === "bmr") {
+      // Use the resumeGame function to restore state
+      resumeGame();
+    } else {
+      // Start at count screen if no saved game
+      state.screen = "count";
+      // Ensure render function exists before calling
+      if (typeof render === 'function') {
+        render();
+      } else {
+        throw new Error('Render function not available');
+      }
+    }
+  } catch (error) {
+    console.error("Initialization error:", error);
+    const app = document.getElementById("app");
+    if (app) {
+      app.innerHTML = `<div class="screen" style="padding:32px;text-align:center">
+        <h2 style="color:var(--red);margin-bottom:16px">Error Loading Page</h2>
+        <p style="color:var(--text2);margin-bottom:8px">${error.message}</p>
+        <p style="color:var(--text3);font-size:12px;margin-bottom:16px">Please check the browser console for more details.</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="location.reload()">Reload Page</button>
+      </div>`;
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
