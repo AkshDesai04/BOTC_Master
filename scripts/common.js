@@ -1071,17 +1071,15 @@ function renderGrimoire() {
 
       let actions = "";
       if (p.alive) {
+        // Execute: always available
+        actions += `<button class="btn-sm" style="background:rgba(243,156,18,0.12);color:var(--orange)" onclick="executePlayer(${i})">⚖️ Execute</button> `;
         // Kill: night only, not first night
         if (isNight && !gs.isFirstNight && !gs.nightKillDone) {
           actions += `<button class="btn-sm" style="background:rgba(231,76,60,0.12);color:var(--red)" onclick="killPlayer(${i})">💀 Kill</button> `;
         }
-        // Execute: day only, max 1/day
-        if (isDay && gs.executedToday === null) {
-          actions += `<button class="btn-sm" style="background:rgba(243,156,18,0.12);color:var(--orange)" onclick="executePlayer(${i})">⚖️ Execute</button> `;
-        }
         // Toggles
         actions += `<button class="btn-sm" style="background:${p.poisoned?'rgba(39,174,96,0.12)':'rgba(155,89,182,0.12)'};color:${p.poisoned?'var(--green)':'var(--purple)'}" onclick="togglePoison(${i})">${p.poisoned?'💊 Cure':'☠️ Poison'}</button> `;
-        actions += `<button class="btn-sm" style="background:${p.protected?'rgba(39,174,96,0.12)':'rgba(41,128,185,0.12)'};color:${p.protected?'var(--green)':'var(--blue)'}" onclick="toggleProtect(${i})">${p.protected?'🛡️−':'🛡️+'}</button> `;
+        actions += `<button class="btn-sm" style="background:${p.protected?'rgba(39,174,96,0.12)':'rgba(41,128,185,0.12)'};color:${p.protected?'var(--green)':'var(--blue)'}" onclick="toggleProtect(${i})">${p.protected?'🛡️ Unprotect':'🛡️ Protect'}</button> `;
       } else {
         actions = `<button class="btn-sm" style="background:rgba(39,174,96,0.12);color:var(--green)" onclick="revivePlayer(${i})">✨ Revive</button> `;
         if (p.ghostVote && !p.ghostUsed) {
