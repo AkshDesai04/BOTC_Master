@@ -3337,7 +3337,8 @@ function renderStepShowCards(step) {
     // BMR: Courtier — pick character (not player) to make drunk
     case "courtier_pick": {
       html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Choose a CHARACTER to make drunk for 3 nights:</div>`;
-      Object.values(c).forEach(ch2 => {
+      const inPlayIds = new Set(gs.players.map(p => p.actual));
+      Object.values(c).filter(ch => inPlayIds.has(ch.id)).forEach(ch2 => {
         const clr = TYPE_CLR[ch2.type];
         html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;color:${clr.txt}" onclick="nightAction_courtierPick('${ch2.id}')">
           ${TEMOJI[ch2.type]} ${ch2.name}</button>`;
