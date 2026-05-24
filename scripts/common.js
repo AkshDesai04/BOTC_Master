@@ -3355,13 +3355,13 @@ function renderStepShowCards(step) {
       if (phase === "drunk") {
         html += `<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:6px">✅ Protecting: ${picks.map(idx=>gs.players[idx].name).join(" & ")}</div>`;
         const drunkCount = gs.players.filter(p => p.drunkSource).length;
-        if (drunkCount >= 2) {
+        if (drunkCount >= 1) {
           html += `<div class="warn warn-red" style="margin-bottom:6px;padding:8px;border-radius:6px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.3)">⚠️ WARNING: There are already ${drunkCount} drunk players in the game (Usually max 2).</div>`;
         }
         html += `<div style="font-size:12px;color:var(--orange);margin-bottom:6px">Now choose which one is DRUNK:</div>`;
         picks.forEach(idx => {
           const p = gs.players[idx]; const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-          const warnClick = drunkCount >= 2 ? `if(confirm('There are already ${drunkCount} drunk players. Make ${esc(p.name).replace(/'/g, "\\'")} drunk anyway?')) ` : ``;
+          const warnClick = drunkCount >= 1 ? `if(confirm('There are already ${drunkCount} drunk players. Make ${esc(p.name).replace(/'/g, "\\'")} drunk anyway?')) ` : ``;
           html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:var(--orange);color:var(--orange)" onclick="${warnClick}nightAction_innkeeperDrunk(${idx})">
             🍺 ${esc(p.name)} (${ch2?.name})</button>`;
         });
