@@ -28,7 +28,11 @@
     
     // Check for saved game
     const saved = loadFromStorage();
-    if (saved && saved._saved && saved.scriptId === "tb") {
+    if (saved && saved._saved) {
+      if (saved.scriptId !== "tb") {
+        window.location.replace(saved.scriptId === "bmr" ? "bad_moon_rising.html" : "index.html");
+        return;
+      }
       // Restore saved state manually (don't use resumeGame as it calls render immediately)
       Object.assign(state, {
         screen: saved.screen || "count",

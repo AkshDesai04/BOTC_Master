@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>🩸 BOTC Storyteller</title>
 <link rel="stylesheet" href="styles/main.css">
+<script>
+  try {
+    const raw = localStorage.getItem("botc_storyteller_v2");
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved && saved.scriptId) {
+        if (saved.scriptId === "tb") {
+          window.location.replace("trouble_brewing.html");
+        } else if (saved.scriptId === "bmr") {
+          window.location.replace("bad_moon_rising.html");
+        }
+      }
+    }
+  } catch(e) {}
+</script>
 </head>
 <body>
 
