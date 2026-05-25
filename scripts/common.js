@@ -1,3737 +1,1639 @@
+// ══════════════════════════════════════════════════════════════════════════
+// BOTC STORYTELLER ENGINE — REDESIGN
+// ══════════════════════════════════════════════════════════════════════════
 
-// ══════════════════════════════════════════════════════════════════════════
-// TEAM COLORS & EMOJIS (shared)
-// ══════════════════════════════════════════════════════════════════════════
+// Shared visual configuration
 const TYPE_CLR = {
-  townsfolk: {bg:"rgba(41,128,185,0.06)", bdr:"#2980b9", txt:"#5dade2"},
-  outsider:  {bg:"rgba(22,160,133,0.06)", bdr:"#1abc9c", txt:"#48c9b0"},
-  minion:    {bg:"rgba(142,68,173,0.06)", bdr:"#8e44ad", txt:"#bb8fce"},
-  demon:     {bg:"rgba(184,29,36,0.06)",  bdr:"#b81d24", txt:"#e74c3c"},
+  townsfolk: { bg: "rgba(45, 90, 39, 0.08)", bdr: "#2D5A27", txt: "#a3e498" },
+  outsider:  { bg: "rgba(41, 128, 185, 0.08)", bdr: "#2980b9", txt: "#5dade2" },
+  minion:    { bg: "rgba(142, 68, 173, 0.08)", bdr: "#8e44ad", txt: "#bb8fce" },
+  demon:     { bg: "rgba(149, 27, 30, 0.08)", bdr: "#951B1E", txt: "#e74c3c" },
+  traveller: { bg: "rgba(243, 156, 18, 0.08)", bdr: "#f39c12", txt: "#f5b041" }
 };
-const TEMOJI = {townsfolk:"🏘️", outsider:"🌿", minion:"🗡️", demon:"👹"};
+const TEMOJI = { townsfolk: "🏘️", outsider: "🌿", minion: "🗡️", demon: "👹", traveller: "🤹" };
 
-// ── Script accessor ──
-function S() { return state.scriptId === "tb" ? TB : BMR; }
-
-// ══════════════════════════════════════════════════════════════════════════
-// UTILITIES
-// ══════════════════════════════════════════════════════════════════════════
-function esc(s) { if(!s)return""; return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
-function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
-function formatTime(secs) { const m=Math.floor(secs/60); const s=secs%60; return `${m}:${s<10?'0':''}${s}`; }
-
-// Get role image path
-// Note: Download script saves files with extensions from wiki (.png, .jpg, etc.)
-// This function returns .png path - if file has different extension, it will gracefully fail
-function getRoleImage(roleId, type) {
-  if (!roleId || !type) return null;
-  // Map type to directory name (matching download script structure)
-  const typeMap = {
-    townsfolk: "townsfolk",
-    outsider: "outsiders",
-    minion: "minions",
-    demon: "demons",
-    traveller: "travellers"
-  };
-  const dir = typeMap[type] || "townsfolk";
-  // Default to .png - if download script saved with different extension,
-  // the onerror handler will hide the image gracefully
-  return `assets/images/${dir}/${roleId}.png`;
+// Access the active script object
+function S() {
+  if (state.scriptId === "tb") return TB;
+  if (state.scriptId === "bmr") return BMR;
+  if (state.scriptId === "sv") return SV;
+  return TB;
 }
 
-// Render role image with graceful fallback
-// Tries .png first, then attempts other common extensions if .png fails
+// ══════════════════════════════════════════════════════════════════════════
+// CORE UTILITIES
+// ══════════════════════════════════════════════════════════════════════════
+function esc(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function shuffle(a) {
+  const b = [...a];
+  for (let i = b.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [b[i], b[j]] = [b[j], b[i]];
+  }
+  return b;
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+// Render fallback character emojis or loaded images gracefully
 function renderRoleImage(roleId, type, size = 32, style = "") {
   if (!roleId || !type) return "";
-  
-  const typeMap = {
-    townsfolk: "townsfolk",
-    outsider: "outsiders",
-    minion: "minions",
-    demon: "demons",
-    traveller: "travellers"
-  };
+  const typeMap = { townsfolk: "townsfolk", outsider: "outsiders", minion: "minions", demon: "demons", traveller: "travellers" };
   const dir = typeMap[type] || "townsfolk";
   const basePath = `assets/images/${dir}/${roleId}`;
-  
-  // Simple img tag - browser will handle missing images gracefully
-  // If image doesn't exist, onerror will hide it
-  return `<img src="${basePath}.png" alt="${roleId}" style="width:${size}px;height:${size}px;object-fit:contain;${style}" onerror="this.style.display='none'">`;
+  return `<img src="${basePath}.png" alt="${roleId}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:50%;background:rgba(0,0,0,0.1);padding:2px;${style}" onerror="this.outerHTML='<span style=\\'font-size:${size * 0.75}px;display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px\\'>${TEMOJI[type]||'❓'}</span>'">`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// STATE
+// GLOBAL GAME STATE
 // ══════════════════════════════════════════════════════════════════════════
+const SAVE_KEY = "botc_storyteller_v2";
+
 let state = {
-  screen: "select",       // select | count | names | characters | travellers | showroles | game
-  scriptId: null,         // "tb" | "bmr"
-  playerCount: 10,
+  screen: "select",       // select | count | names | roles | reveal | game | victory
+  scriptId: null,         // tb | bmr | sv
+  playerCount: 8,
   names: [],
   nameInput: "",
 
-  // Character selection
-  selTF: [], selOS: [], selMN: [], selDM: [],
-  selTR: [],                 // Selected Traveller characters (IDs)
-  travellerData: [],          // Array of {character, name, alignment} for each selected Traveller
-  godfatherOutsiderMod: 0, // BMR only: -1, 0, +1
-  drunkAs: "",              // TB only: which TF the Drunk believes they are
+  // Role setup
+  dist: { t: 0, o: 0, m: 0, d: 0 }, // Modified distribution
+  rolePool: [],           // List of role IDs selected in the game pool
+  assignments: {},        // playerIndex -> roleId
+  revealIndex: 0,         // Index of player during hand-off role reveal
 
-  // Travellers
-  travellersEnabled: false,
-  travellersToggle: false,  // Toggle to show/hide Travellers section
-  travellers: [],            // Array of {name, character, alignment, seat, alive, exiled, notes, ...}
+  // Active game variables
+  dayNum: 1,
+  phase: "night",         // night | day
+  activeWakeIdx: 0,       // current woken role in night sequence
+  nightLog: [],           // current night choices/actions
+  alive: {},              // playerIndex -> boolean
+  nominations: [],        // list of nominations today
+  votes: {},              // playerIndex -> number of vote tokens (default 1)
+  ghostVotes: {},         // playerIndex -> boolean (used ghost vote)
+  deathsLastNight: [],    // tracking deaths
+  chronicle: [],          // chronological logs of events: { type, nightNum, dayNum, title, details, badgeColor }
+  drawerOpen: false,      // storyteller sidebar menu drawer state
+  winTeam: null,          // good | evil
 
-  // Game state
-  gs: null,
+  // Timers
+  timerSeconds: 300,
+  timerTotal: 300,
+  timerRunning: false,
+  timerIntervalId: null,
 
-  // UI state
-  tab: "grimoire",
-  expandedPlayer: -1,
-  expandedTraveller: -1,
-  nightPhase: "none",
-  nightStep: 0,
-  nightStepData: {},
-  undoStack: [],
-  confirm: null,
-
-  // Overlay state
-  showingRoleFor: -1,
-  showCard: null,
-  rolesShown: [],
-
-  // Timer
-  timer: { phase:0, running:false, paused:false, seconds:0, totalSeconds:0, alarm:false, intervalId:null, durations:[180,120,30], showSettings:false },
+  // UI helpers
+  tab: "grimoire",        // grimoire | night | day | chronicle
+  confirm: null,          // confirm dialog modal state
+  showCard: null,         // popup dismissible card modal state
 };
 
-// ══════════════════════════════════════════════════════════════════════════
-// SAVE / LOAD
-// ══════════════════════════════════════════════════════════════════════════
-const SAVE_KEY = "botc_storyteller_v2";
-const LISTS_KEY = "botc_player_lists";
-
+// Auto save state
 function autoSave() {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      _v: 2, _saved: Date.now(),
-      screen: state.screen, scriptId: state.scriptId,
-      playerCount: state.playerCount, names: state.names,
-      selTF: state.selTF, selOS: state.selOS, selMN: state.selMN, selDM: state.selDM,
-      selTR: state.selTR || [], travellerData: state.travellerData || [],
-      godfatherOutsiderMod: state.godfatherOutsiderMod, drunkAs: state.drunkAs,
-      travellersEnabled: state.travellersEnabled ?? false,
-      travellersToggle: state.travellersToggle ?? false,
-      travellers: state.travellers || [],
-      gs: state.gs, tab: state.tab, nightStep: state.nightStep,
-      nightPhase: state.nightPhase, undoStack: state.undoStack,
-      rolesShown: state.rolesShown, expandedTraveller: state.expandedTraveller,
+      _saved: Date.now(),
+      screen: state.screen,
+      scriptId: state.scriptId,
+      playerCount: state.playerCount,
+      dist: state.dist,
+      names: state.names,
+      rolePool: state.rolePool,
+      assignments: state.assignments,
+      revealIndex: state.revealIndex,
+      dayNum: state.dayNum,
+      phase: state.phase,
+      activeWakeIdx: state.activeWakeIdx,
+      nightLog: state.nightLog,
+      alive: state.alive,
+      nominations: state.nominations,
+      votes: state.votes,
+      ghostVotes: state.ghostVotes,
+      deathsLastNight: state.deathsLastNight,
+      chronicle: state.chronicle,
+      winTeam: state.winTeam,
+      timerSeconds: state.timerSeconds,
+      timerTotal: state.timerTotal,
+      tab: state.tab,
     }));
-  } catch(e) {}
+  } catch (e) {}
 }
 
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch(e) { return null; }
+  } catch (e) { return null; }
 }
 
 function clearSave() {
-  try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
+
+function resetEngine() {
+  stopTimer();
+  clearSave();
+  state = {
+    screen: "select",
+    scriptId: null,
+    playerCount: 8,
+    names: [],
+    nameInput: "",
+    dist: { t: 0, o: 0, m: 0, d: 0 },
+    rolePool: [],
+    assignments: {},
+    revealIndex: 0,
+    dayNum: 1,
+    phase: "night",
+    activeWakeIdx: 0,
+    nightLog: [],
+    alive: {},
+    nominations: [],
+    votes: {},
+    ghostVotes: {},
+    deathsLastNight: [],
+    chronicle: [],
+    drawerOpen: false,
+    winTeam: null,
+    timerSeconds: 300,
+    timerTotal: 300,
+    timerRunning: false,
+    timerIntervalId: null,
+    tab: "grimoire",
+    confirm: null,
+    showCard: null
+  };
+  autoSave();
+  render();
 }
 
 function resumeGame() {
   const saved = loadFromStorage();
-  if (!saved) return;
-  Object.assign(state, {
-    screen: saved.screen, scriptId: saved.scriptId,
-    playerCount: saved.playerCount, names: saved.names || [],
-    selTF: saved.selTF || [], selOS: saved.selOS || [],
-    selMN: saved.selMN || [], selDM: saved.selDM || [],
-    selTR: saved.selTR || [], travellerData: saved.travellerData || [],
-    godfatherOutsiderMod: saved.godfatherOutsiderMod || 0,
-    drunkAs: saved.drunkAs || "",
-    travellersEnabled: saved.travellersEnabled ?? false,
-    travellersToggle: saved.travellersToggle ?? false,
-    travellers: saved.travellers || [],
-    gs: saved.gs, tab: saved.tab || "grimoire",
-    nightStep: saved.nightStep || 0, nightPhase: saved.nightPhase || "none",
-    undoStack: saved.undoStack || [],
-    rolesShown: saved.rolesShown || [],
-    expandedPlayer: -1, expandedTraveller: saved.expandedTraveller ?? -1,
-    confirm: null, showCard: null, showingRoleFor: -1,
-    timer: null,
-  });
-  state.showResume = false;
-  render();
-}
-
-function newGame() {
-  clearSave();
-  state = {
-    screen: "select", scriptId: null, playerCount: 10,
-    names: [], nameInput: "",
-    selTF: [], selOS: [], selMN: [], selDM: [],
-    selTR: [], travellerData: [],
-    godfatherOutsiderMod: 0, drunkAs: "",
-    travellersEnabled: false, travellersToggle: false, travellers: [],
-    gs: null, tab: "grimoire", expandedPlayer: -1, expandedTraveller: -1,
-    nightPhase: "none", nightStep: 0, nightStepData: {},
-    undoStack: [], confirm: null,
-    showingRoleFor: -1, showCard: null, rolesShown: [],
-    timer: { phase:0, running:false, paused:false, seconds:0, totalSeconds:0, alarm:false, intervalId:null, durations:[180,120,30], showSettings:false },
-  };
-  render();
-}
-
-// Player Lists
-function savePlayerList(name) {
-  try {
-    const lists = JSON.parse(localStorage.getItem(LISTS_KEY) || "[]");
-    lists.push({ name, players: [...state.names], count: state.playerCount, saved: Date.now() });
-    localStorage.setItem(LISTS_KEY, JSON.stringify(lists.slice(-20))); // Max 20 lists
-  } catch(e) {}
-}
-function getPlayerLists() {
-  try { return JSON.parse(localStorage.getItem(LISTS_KEY) || "[]"); } catch(e) { return []; }
-}
-function deletePlayerList(idx) {
-  try {
-    const lists = getPlayerLists();
-    lists.splice(idx, 1);
-    localStorage.setItem(LISTS_KEY, JSON.stringify(lists));
-  } catch(e) {}
-  render();
-}
-function loadPlayerList(idx) {
-  const lists = getPlayerLists();
-  if (!lists[idx]) return;
-  const list = lists[idx];
-  state.names = [...list.players];
-  state.playerCount = list.count;
-  state.showLoadList = false;
-  autoSave();
-  render();
+  if (saved) {
+    Object.assign(state, saved);
+    if (!saved.dist) {
+      const s = S();
+      const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
+      state.dist = { ...d };
+    }
+    state.showResume = false;
+    if (state.timerRunning) {
+      state.timerRunning = false; // pause on reload for safety
+    }
+    render();
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// UNDO
-// ══════════════════════════════════════════════════════════════════════════
-function pushUndo() {
-  if (!state.gs) return;
-  state.undoStack = [...state.undoStack, deepCopy(state.gs)].slice(-5);
-}
-function undoAction() {
-  if (state.undoStack.length === 0) return;
-  const stack = [...state.undoStack];
-  state.gs = stack.pop();
-  state.undoStack = stack;
-  autoSave();
-  render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// RENDER ENGINE
+// RENDER ROUTINE
 // ══════════════════════════════════════════════════════════════════════════
 function render() {
   const app = document.getElementById("app");
-  // Track screen changes for fade-in
-  const screenChanged = state._lastScreen !== state.screen;
-  state._lastScreen = state.screen;
-  state._fadeIn = screenChanged;
+  if (!app) return;
+
   let html = renderHeader();
 
   switch (state.screen) {
     case "select":     html += renderSelectScreen(); break;
     case "count":      html += renderCountScreen(); break;
     case "names":      html += renderNamesScreen(); break;
-    case "characters": html += renderCharScreen(); break;
-    case "showroles":  html += renderShowRolesScreen(); break;
+    case "roles":      html += renderRolesScreen(); break;
+    case "reveal":     html += renderRevealScreen(); break;
     case "game":       html += renderGameScreen(); break;
+    case "victory":    html += renderVictoryScreen(); break;
   }
 
   html += renderOverlays();
   app.innerHTML = html;
 
-  // Auto-focus name input if on names screen
+  // Roster input focus helper
   if (state.screen === "names" && state.names.length < state.playerCount) {
-    setTimeout(() => { const el = document.getElementById("nameInput"); if (el && !el.value) el.focus(); }, 50);
+    const el = document.getElementById(`name-input-${state.names.length}`);
+    if (el) setTimeout(() => el.focus(), 80);
   }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// HEADER
+// HEADER & STYLED APP TOP BAR
 // ══════════════════════════════════════════════════════════════════════════
 function renderHeader() {
+  const hasGameActive = state.screen === "game" || state.screen === "reveal" || state.screen === "victory";
   const s = state.scriptId ? S() : null;
-  const titleColor = s ? s.color : "var(--red)";
-  const titleText = s ? s.name : "BOTC STORYTELLER";
 
-  let badge = "";
-  if (state.gs) {
-    const isNight = state.gs.phase === "night";
-    badge = `<div class="phase-badge ${isNight?'warn-red':'warn-orange'}" style="margin:0;font-size:11px;font-weight:700">
-      ${isNight?"🌙":"☀️"} ${isNight?"Night":"Day"} ${state.gs.dayNum||1}
-    </div>`;
-  }
-
-  let rightBtns = "";
-  if (state.screen === "game" || state.screen === "showroles") {
-    rightBtns = `<button class="btn-outline" style="font-size:11px;padding:6px 10px;color:var(--red);border-color:rgba(184,29,36,0.3)"
-      onclick="state.confirm={msg:'Start a completely new game? Current progress will be lost.',onYes:'newGame'};render()">New Game</button>`;
-  }
-
-  return `<div class="header">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:20px;display:inline-flex">${s ? s.emoji : '🩸'}</span>
-      <span class="header-title" style="color:${titleColor}">${titleText}</span>
+  return `
+    <div class="header" style="position:relative">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button onclick="toggleDrawer()" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">☰</button>
+        <span class="header-title" style="color:${s ? s.color : 'var(--text)'};font-family:var(--font-serif)">
+          ${s ? s.name : "Storyteller's Grimoire"}
+        </span>
+      </div>
+      ${hasGameActive ? `
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="phase-badge ${state.phase === 'night' ? 'warn-red' : 'warn-orange'}" style="margin:0;font-size:10px;font-weight:700">
+            ${state.phase === 'night' ? '🌙 Night' : '☀️ Day'} ${state.dayNum}
+          </div>
+        </div>
+      ` : ''}
     </div>
-    <div style="display:flex;align-items:center;gap:10px">${rightBtns}${badge}</div>
-  </div>`;
+  `;
+}
+
+// Toggle drawer state
+function toggleDrawer() {
+  state.drawerOpen = !state.drawerOpen;
+  render();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// OVERLAYS (Confirm, Show Card, Role Reveal, Resume)
+// OVERLAYS (Drawer, Modal cards, Confirm prompts)
 // ══════════════════════════════════════════════════════════════════════════
 function renderOverlays() {
   let html = "";
 
-  // Resume prompt
+  // Storyteller Navigation Sidebar Drawer
+  if (state.drawerOpen) {
+    html += `
+      <div class="overlay" style="z-index:900;background:rgba(0,0,0,0.6)" onclick="toggleDrawer()">
+        <div class="drawer-menu" style="position:absolute;left:0;top:0;bottom:0;width:280px;background:var(--surface2);border-right:1px solid var(--border);padding:24px 16px;display:flex;flex-direction:column;gap:18px;animation:slideIn 0.2s ease-out" onclick="event.stopPropagation()">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:12px">
+            <h3 style="font-family:var(--font-serif);color:var(--text)">Storyteller Menu</h3>
+            <button onclick="toggleDrawer()" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer">✕</button>
+          </div>
+          
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.confirm={msg:'Start a completely new session? Your current game will be erased.',onYes:'resetEngine'};render()">🔄 Reset Session</button>
+            <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.showCard={title:'Volume Control',text:'Adjust phone notifications or alarm sounds. Digital clock sound registers automatically at countdown end.',emoji:'🔊'};render()">🔊 Alarm Volume</button>
+            <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.showCard={title:'Rulebook Quick Reference',text:'1. Good wins if the Demon dies and cannot make a starpass.\\n2. Evil wins if only 2 players are alive and the Demon survives.\\n3. Keep your private grim hidden from players during Night hand-offs!',emoji:'📖'};render()">📖 Rules Quickref</button>
+          </div>
+
+          <div style="margin-top:auto;border-top:1px solid var(--border);padding-top:16px;font-size:11px;color:var(--text3);text-align:center">
+            BOTC Grimoire companion v2.0
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Resume state prompt
   if (state.showResume) {
-    const saved = loadFromStorage();
-    const when = saved?._saved ? new Date(saved._saved).toLocaleString() : "unknown";
-    const sData = saved?.scriptId === "tb" ? TB : BMR;
-    const sName = sData?.name || "Unknown";
-    const sEmoji = sData?.emoji || "🩸";
-    const phase = saved?.gs ? `${saved.gs.phase==="night"?"🌙 Night":"☀️ Day"} ${saved.gs.dayNum||1}` : "Setup";
-    const pCount = saved?.gs?.players?.length || saved?.playerCount || "?";
-
-    html += `<div class="overlay" style="z-index:220">
-      <div class="overlay-box" style="border:2px solid var(--blue);box-shadow: 0 0 16px rgba(41, 128, 185, 0.25)">
-        <div style="font-size:36px;margin-bottom:12px">💾</div>
-        <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px">Saved Game Found</div>
-        <div style="font-size:13px;color:var(--text2);margin-bottom:4px">${sEmoji} ${sName}</div>
-        <div style="font-size:13px;color:var(--text2);margin-bottom:4px">${phase} • ${pCount} players</div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:18px">Last saved: ${when}</div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-outline" style="flex:1" onclick="newGame()">New Game</button>
-          <button class="btn btn-blue" style="flex:1" onclick="resumeGame()">Resume</button>
+    const s = state.scriptId ? S() : null;
+    html += `
+      <div class="overlay" style="z-index:220">
+        <div class="overlay-box" style="border:2px solid var(--blue);box-shadow: 0 0 16px rgba(41, 128, 185, 0.2)">
+          <div style="font-size:36px;margin-bottom:12px">💾</div>
+          <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px">Saved Session Found</div>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px">
+            Resume the active game of <strong>${s ? s.name : 'Unknown Script'}</strong>?
+          </p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" style="flex:1;margin:0" onclick="state.showResume=false;resetEngine()">New Game</button>
+            <button class="btn btn-primary" style="flex:1;margin:0" onclick="resumeGame()">Resume</button>
+          </div>
         </div>
       </div>
-    </div>`;
+    `;
   }
 
-  // Confirm dialog
+  // Confirmation box
   if (state.confirm) {
-    html += `<div class="confirm-overlay">
-      <div class="confirm-box">
-        <div style="font-size:36px;margin-bottom:12px">⚠️</div>
-        <div style="font-size:14px;color:var(--text);margin-bottom:18px;line-height:1.5">${state.confirm.msg}</div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-outline" style="flex:1" onclick="state.confirm=null;render()">Cancel</button>
-          <button class="btn btn-primary" style="flex:1" onclick="${state.confirm.onYes}();state.confirm=null;">Confirm</button>
+    html += `
+      <div class="confirm-overlay" style="z-index:250">
+        <div class="confirm-box">
+          <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+          <div style="font-size:13px;color:var(--text);margin-bottom:16px;line-height:1.5">${state.confirm.msg}</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" style="flex:1;margin:0" onclick="state.confirm=null;render()">Cancel</button>
+            <button class="btn btn-primary" style="flex:1;margin:0" onclick="${state.confirm.onYes}();state.confirm=null;">Confirm</button>
+          </div>
         </div>
       </div>
-    </div>`;
+    `;
   }
 
-  // Show Card overlay
+  // Dismissible details card popup
   if (state.showCard) {
-    const sc = state.showCard;
-    html += `<div class="show-card-overlay" onclick="state.showCard=null;render()">
-      <div class="show-card" style="background:var(--surface2);border-color:${sc.borderColor||'var(--border)'};box-shadow: 0 0 20px rgba(0,0,0,0.5)">
-        <div style="font-size:64px;margin-bottom:16px">${sc.emoji||''}</div>
-        <div style="font-size:${sc.fontSize||'28'}px;font-weight:700;color:${sc.color||'var(--text)'};margin-bottom:8px">${sc.title||''}</div>
-        ${sc.subtitle?`<div style="font-size:14px;color:var(--text2);margin-bottom:12px">${sc.subtitle}</div>`:''}
-        ${sc.text?`<div style="font-size:14px;color:var(--text);line-height:1.5;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--border)">${sc.text}</div>`:''}
-        <div style="font-size:11px;color:var(--text3);margin-top:16px;letter-spacing:1px">TAP ANYWHERE TO DISMISS</div>
+    html += `
+      <div class="overlay" style="z-index:300" onclick="state.showCard=null;render()">
+        <div class="show-card" style="background:var(--surface2);border:1px solid var(--border);padding:24px;border-radius:12px;width:90%;max-width:380px;text-align:center;box-shadow: 0 8px 32px rgba(0,0,0,0.6)" onclick="event.stopPropagation()">
+          <div style="font-size:48px;margin-bottom:12px">${state.showCard.emoji || 'ℹ️'}</div>
+          <h3 style="font-family:var(--font-serif);color:var(--text);margin-bottom:8px;font-size:22px">${state.showCard.title}</h3>
+          <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px">${state.showCard.text.replace(/\n/g, '<br>')}</p>
+          <button class="btn btn-primary" style="padding:10px" onclick="state.showCard=null;render()">Dismiss</button>
+        </div>
       </div>
-    </div>`;
-  }
-
-  // Role reveal overlay
-  if (state.showingRoleFor >= 0 && state.gs) {
-    const p = state.gs.players[state.showingRoleFor];
-    const c = S().C;
-    const ch = c[p.actual];
-    const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
-    const clr = TYPE_CLR[showCh?.type || "townsfolk"];
-    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 120, "margin-bottom:12px");
-    html += `<div class="show-card-overlay" onclick="state.showingRoleFor=-1;render()">
-      <div class="show-card" style="background:var(--surface2);border:2px solid ${clr.bdr};box-shadow: 0 0 24px ${clr.bdr}33">
-        ${roleImg || `<div style="font-size:64px;margin-bottom:12px">${TEMOJI[showCh?.type||"townsfolk"]}</div>`}
-        <div style="font-size:12px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">${(showCh?.type||"").toUpperCase()}</div>
-        <div style="font-size:28px;font-weight:600;color:${clr.txt};margin-bottom:16px;font-family:var(--font-serif)">${showCh?.name||''}</div>
-        <div style="font-size:14px;color:var(--text2);line-height:1.6;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--border)">${esc(showCh?.ab||'')}</div>
-        ${ch?.team==="evil"?`<div style="margin-top:14px;padding:8px 16px;background:rgba(184,29,36,0.12);border:1px solid rgba(184,29,36,0.25);border-radius:8px;font-size:13px;color:var(--red);font-weight:700;letter-spacing:1px">😈 YOU ARE EVIL</div>`:''}
-        <div style="font-size:11px;color:var(--text3);margin-top:20px;letter-spacing:1px">TAP ANYWHERE TO DISMISS</div>
-      </div>
-    </div>`;
+    `;
   }
 
   return html;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// SCREEN: Script Selector
+// FLOW 1: SCRIPT SELECTION SCREEN (`Script Selection.png`)
 // ══════════════════════════════════════════════════════════════════════════
 function renderSelectScreen() {
-  return `<div class="screen${state._fadeIn?' fade-in':''}" style="padding-top:32px">
-    <div style="text-align:center;margin-bottom:32px">
-      <div style="font-size:40px;margin-bottom:8px">🩸</div>
-      <h1 style="font-size:24px;font-weight:600;color:var(--text);margin-bottom:4px">Storyteller's Grimoire</h1>
-      <p style="color:var(--text2);font-size:13px">Choose your script to begin</p>
-    </div>
+  const scripts = [
+    {
+      id: "tb",
+      name: "Trouble Brewing",
+      emoji: "🍸",
+      color: "#951B1E",
+      desc: "A perfect introduction. Deception is straightforward, and the evils are known. Ideal for newer players and storytellers alike.",
+      tag: "Recommended for new players"
+    },
+    {
+      id: "bmr",
+      name: "Bad Moon Rising",
+      emoji: "🌙",
+      color: "#f39c12",
+      desc: "Death is not the end, and survival is not guaranteed. Focuses heavily on deduction through night deaths and complex mechanics.",
+      tag: "More complex — experienced players"
+    },
+    {
+      id: "sv",
+      name: "Sects & Violets",
+      emoji: "👁️",
+      color: "#9b59b6",
+      desc: "Madness and misinformation rule. A highly complex script where alignments shift and information is rarely what it seems.",
+      tag: "High madness and information control"
+    }
+  ];
 
-    <div class="script-card" style="border-color:${TB.color}33" onclick="selectScript('tb')">
-      <div style="font-size:36px;margin-bottom:8px">${TB.emoji}</div>
-      <div style="font-size:18px;font-weight:600;color:${TB.color};margin-bottom:4px;font-family:var(--font-serif)">${TB.name}</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:2px">${TB.desc}</div>
-      <div style="font-size:11px;color:var(--text3)">${TB.tagline}</div>
-    </div>
+  let cards = "";
+  scripts.forEach(s => {
+    cards += `
+      <div class="script-card" style="border: 1px solid ${s.color}33;background:rgba(30,30,30,0.4);border-radius:12px;padding:20px;margin-bottom:14px;cursor:pointer;transition:all 0.2s" onclick="pickScript('${s.id}')">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:36px">${s.emoji}</div>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:${s.color}">${s.tag}</span>
+        </div>
+        <h3 style="font-family:var(--font-serif);color:${s.color};font-size:20px;margin-bottom:6px">${s.name}</h3>
+        <p style="font-size:12px;color:var(--text3);line-height:1.5">${s.desc}</p>
+      </div>
+    `;
+  });
 
-    <div class="script-card" style="border-color:${BMR.color}33" onclick="selectScript('bmr')">
-      <div style="font-size:36px;margin-bottom:8px">${BMR.emoji}</div>
-      <div style="font-size:18px;font-weight:600;color:${BMR.color};margin-bottom:4px;font-family:var(--font-serif)">${BMR.name}</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:2px">${BMR.desc}</div>
-      <div style="font-size:11px;color:var(--text3)">${BMR.tagline}</div>
+  return `
+    <div class="screen fade-in" style="padding-top:16px">
+      <div style="margin-bottom:24px">
+        <h2 style="font-family:var(--font-serif);font-size:28px;margin-bottom:4px">Script Selection</h2>
+        <p style="color:var(--text3);font-size:13px">Choose the fate of Ravenswood Bluff.</p>
+      </div>
+      
+      <div style="margin-bottom:20px">${cards}</div>
     </div>
-  </div>`;
+  `;
 }
 
-function selectScript(id) {
+function pickScript(id) {
   state.scriptId = id;
-  state.selDM = S().demonFixed ? [...S().defaultDemon] : [];
   state.screen = "count";
+  const s = S();
+  const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
+  state.dist = { ...d };
   autoSave();
   render();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// SCREEN: Player Count
+// FLOW 2: PLAYER SETUP SCREEN (`Player Setup.png`)
 // ══════════════════════════════════════════════════════════════════════════
 function renderCountScreen() {
   const s = S();
-  const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
+  const d = state.dist;
+  const total = (d.t || 0) + (d.o || 0) + (d.m || 0) + (d.d || 1);
+  const mismatch = total !== state.playerCount;
 
-  return `<div class="screen${state._fadeIn?' fade-in':''}" style="text-align:center;padding-top:32px">
-    <h2 style="color:${s.color};margin-bottom:8px;font-size:24px;font-family:var(--font-serif)">${s.emoji} ${s.name}</h2>
-    <p style="color:var(--text2);font-size:13px;margin-bottom:24px">How many players? (excluding Storyteller)</p>
-
-    <div style="padding:0 24px;margin-bottom:28px">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <span style="font-size:13px;color:var(--text3);min-width:30px;font-weight:600">5</span>
-        <input type="range" min="5" max="25" value="${state.playerCount}" 
-          style="flex:1;outline:none;cursor:pointer"
-          oninput="updatePlayerCount(this.value)"
-          onchange="updatePlayerCount(this.value)">
-        <span style="font-size:13px;color:var(--text3);min-width:30px;font-weight:600">25</span>
+  return `
+    <div class="screen fade-in" style="padding-top:16px">
+      <div style="margin-bottom:24px">
+        <h2 style="font-family:var(--font-serif);font-size:28px;margin-bottom:4px">Player Setup</h2>
+        <p style="color:var(--text3);font-size:13px">Gather your townsfolk. Determine the soul count for tonight's tragedy.</p>
       </div>
-      <input type="number" min="5" max="25" value="${state.playerCount}" 
-        inputmode="numeric"
-        style="font-size:28px;font-weight:700;color:${s.color};margin-top:12px;text-align:center;background:transparent;border:none;outline:none;width:100%;padding:6px;border-radius:8px;transition:background 0.2s;cursor:text"
-        onfocus="this.style.background='rgba(255,255,255,0.05)';this.select()"
-        onblur="this.style.background='transparent';updatePlayerCount(this.value)"
-        onkeydown="if(event.key==='Enter'){this.blur()}"
-        onclick="this.select()">
-    </div>
 
-    <div class="card" style="text-align:left;margin-bottom:28px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.05)">
-      <div style="font-weight:600;margin-bottom:10px;font-size:13px;color:var(--text2);font-family:var(--font-serif)">Distribution for ${state.playerCount} players:</div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px">
-        <span style="color:${TYPE_CLR.townsfolk.txt};background:${TYPE_CLR.townsfolk.bg};border:1px solid ${TYPE_CLR.townsfolk.bdr}33;padding:4px 8px;border-radius:6px">🏘️ ${d.t} Townsfolk</span>
-        <span style="color:${TYPE_CLR.outsider.txt};background:${TYPE_CLR.outsider.bg};border:1px solid ${TYPE_CLR.outsider.bdr}33;padding:4px 8px;border-radius:6px">🌿 ${d.o} Outsiders</span>
-        <span style="color:${TYPE_CLR.minion.txt};background:${TYPE_CLR.minion.bg};border:1px solid ${TYPE_CLR.minion.bdr}33;padding:4px 8px;border-radius:6px">🗡️ ${d.m} Minions</span>
-        <span style="color:${TYPE_CLR.demon.txt};background:${TYPE_CLR.demon.bg};border:1px solid ${TYPE_CLR.demon.bdr}33;padding:4px 8px;border-radius:6px">👹 ${d.d||1} Demon</span>
+      <!-- Player Count Card -->
+      <div class="card" style="padding:24px;border-radius:12px;text-align:center;margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:12px">Number of Players</div>
+
+        <div style="display:flex;align-items:center;justify-content:center;gap:32px;margin-bottom:14px">
+          <button class="timer-adj-btn" style="width:48px;height:48px;font-size:24px" onclick="adjCount(-1)">-</button>
+          <span style="font-size:44px;font-weight:700;color:${s.color};font-family:var(--font-serif)">${state.playerCount}</span>
+          <button class="timer-adj-btn" style="width:48px;height:48px;font-size:24px" onclick="adjCount(1)">+</button>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">
+          <span>Min: 5 players</span>
+          <span>Max: 15 players</span>
+        </div>
       </div>
-    </div>
 
-    <button class="btn btn-primary" style="background:linear-gradient(135deg,${s.color}cc,${s.color})" onclick="goToNames()">Enter Player Names →</button>
-    <button class="btn-outline" style="margin-top:12px;width:100%" onclick="state.screen='select';state.scriptId=null;render()">← Change Script</button>
-  </div>`;
+      <!-- Distribution Preview Card -->
+      <div class="card" style="padding:16px;border-radius:12px;background:rgba(0,0,0,0.15);margin-bottom:24px;border:1px solid ${mismatch ? 'var(--red)' : 'transparent'}">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;font-family:var(--font-serif);display:flex;justify-content:space-between;align-items:center;">
+          <span>STANDARD DISTRIBUTION:</span>
+          <span style="color:${mismatch ? 'var(--red)' : 'var(--green)'};font-size:11px">Total: ${total} / ${state.playerCount}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px">
+          <div style="display:flex;align-items:center;color:${TYPE_CLR.townsfolk.txt};background:${TYPE_CLR.townsfolk.bg};border:1px solid ${TYPE_CLR.townsfolk.bdr}33;padding:6px 10px;border-radius:6px">
+            <span style="flex:1">🏘️ Townsfolk</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('t', -1)">-</button>
+              <span style="font-weight:bold;width:16px;text-align:center;">${d.t}</span>
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('t', 1)">+</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;color:${TYPE_CLR.outsider.txt};background:${TYPE_CLR.outsider.bg};border:1px solid ${TYPE_CLR.outsider.bdr}33;padding:6px 10px;border-radius:6px">
+            <span style="flex:1">🌿 Outsiders</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('o', -1)">-</button>
+              <span style="font-weight:bold;width:16px;text-align:center;">${d.o}</span>
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('o', 1)">+</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;color:${TYPE_CLR.minion.txt};background:${TYPE_CLR.minion.bg};border:1px solid ${TYPE_CLR.minion.bdr}33;padding:6px 10px;border-radius:6px">
+            <span style="flex:1">🗡️ Minions</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('m', -1)">-</button>
+              <span style="font-weight:bold;width:16px;text-align:center;">${d.m}</span>
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('m', 1)">+</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;color:${TYPE_CLR.demon.txt};background:${TYPE_CLR.demon.bg};border:1px solid ${TYPE_CLR.demon.bdr}33;padding:6px 10px;border-radius:6px">
+            <span style="flex:1">👹 Demon</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('d', -1)">-</button>
+              <span style="font-weight:bold;width:16px;text-align:center;">${d.d ?? 1}</span>
+              <button class="timer-adj-btn" style="width:20px;height:20px;font-size:12px" onclick="adjDist('d', 1)">+</button>
+            </div>
+          </div>
+        </div>
+        ${mismatch ? `<div style="color:var(--red);font-size:11px;margin-top:10px;text-align:center;font-weight:bold">⚠️ Distribution does not match player count!</div>` : ''}
+      </div>
+
+      <button class="btn btn-primary" ${mismatch ? 'style="opacity:0.5;pointer-events:none"' : ''} onclick="proceedToNames()">Proceed to Player Roster →</button>
+      <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='select';render()">← Back to Scripts</button>
+    </div>
+  `;
 }
 
-function setPlayerCount(n) {
-  state.playerCount = n;
-  state.names = state.names.slice(0, n);
+function adjDist(type, delta) {
+  const s = S();
+  // Get available characters for this script
+  const availableCount = Object.values(s.C).filter(c => c.type === (type === 't' ? 'townsfolk' : type === 'o' ? 'outsider' : type === 'm' ? 'minion' : 'demon')).length;
+  const min = type === 'd' ? 1 : 0;
+  state.dist[type] = Math.max(min, Math.min(availableCount, (state.dist[type] || 0) + delta));
   autoSave();
   render();
 }
 
-function updatePlayerCount(val, skipRender) {
-  const num = Math.min(25, Math.max(5, parseInt(val) || 10));
-  state.playerCount = num;
+function adjCount(delta) {
+  state.playerCount = Math.max(5, Math.min(15, state.playerCount + delta));
+  const s = S();
+  const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
+  state.dist = { ...d };
   autoSave();
-  if (!skipRender) render();
+  render();
 }
-
-function goToNames() {
+function proceedToNames() {
+  // Pad names array to length
+  while (state.names.length < state.playerCount) {
+    state.names.push("");
+  }
   state.screen = "names";
   autoSave();
   render();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// SCREEN: Names
+// FLOW 2 (cont): PLAYER ROSTER NAMES
 // ══════════════════════════════════════════════════════════════════════════
 function renderNamesScreen() {
-  const count = state.playerCount;
-  const names = state.names;
-  const lists = getPlayerLists();
+  const entered = state.names.filter(n => n.trim() !== "").length;
 
-  let list = "";
-  names.forEach((n, i) => {
-    list += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:8px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
-      <span style="width:24px;height:24px;border-radius:50%;background:${S().color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i+1}</span>
-      <span style="flex:1;font-weight:600;color:var(--text);font-size:14px">${esc(n)}</span>
-      <button class="btn-outline" style="padding:4px 8px;font-size:12px;margin:0" onclick="moveName(${i},-1)" ${i===0?"disabled":""}>↑</button>
-      <button class="btn-outline" style="padding:4px 8px;font-size:12px;margin:0" onclick="moveName(${i},1)" ${i===names.length-1?"disabled":""}>↓</button>
-      <button class="btn-outline" style="padding:4px 8px;font-size:12px;color:var(--red);border-color:rgba(184,29,36,0.3);margin:0" onclick="removeName(${i})">✕</button>
-    </div>`;
-  });
-
-  const canProceed = names.length === count;
-
-  // Save/Load list buttons
-  let listBtns = "";
-  if (canProceed) {
-    listBtns += `<button class="btn-outline" style="margin-right:8px;font-size:11px;font-weight:600;letter-spacing:1px" onclick="promptSaveList()">💾 SAVE LIST</button>`;
-  }
-  if (lists.length > 0) {
-    listBtns += `<button class="btn-outline" style="font-size:11px;font-weight:600;letter-spacing:1px" onclick="state.showLoadList=!state.showLoadList;render()">📋 LOAD LIST (${lists.length})</button>`;
-  }
-
-  // Load list panel
-  let loadPanel = "";
-  if (state.showLoadList && lists.length > 0) {
-    loadPanel = `<div class="card" style="margin-bottom:16px;border-color:rgba(41,128,185,0.3);background:var(--surface2)">
-      <div style="font-weight:600;font-size:13px;color:var(--blue);margin-bottom:10px;font-family:var(--font-serif)">Saved Player Lists</div>`;
-    lists.forEach((l, i) => {
-      loadPanel += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
-        <div onclick="loadPlayerList(${i})" style="cursor:pointer;flex:1">
-          <div style="font-weight:600;font-size:13px;color:var(--text)">${esc(l.name)}</div>
-          <div style="font-size:11px;color:var(--text3)">${l.count}p • ${l.players.slice(0,3).join(", ")}${l.count>3?"...":""}</div>
-        </div>
-        <button class="btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);border-color:rgba(184,29,36,0.3);margin:0" onclick="deletePlayerList(${i})">✕</button>
-      </div>`;
-    });
-    loadPanel += `</div>`;
-  }
-
-  return `<div class="screen${state._fadeIn?' fade-in':''}">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div>
-        <h2 style="font-size:22px;color:${S().color};font-family:var(--font-serif)">Player Names</h2>
-        <p style="color:var(--text2);font-size:12px">${names.length}/${count} — clockwise seating order</p>
+  let roster = "";
+  for (let i = 0; i < state.playerCount; i++) {
+    roster += `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div class="seat-num" style="background:var(--border);border:none;width:28px;height:28px">${i + 1}</div>
+        <input type="text" id="name-input-${i}" class="input" style="flex:1" 
+          value="${esc(state.names[i])}" 
+          placeholder="Enter player name..." 
+          oninput="savePlayerName(${i}, this.value)"
+          onkeydown="if(event.key==='Enter') focusNextName(${i})">
       </div>
-      <button class="btn-outline" style="margin:0" onclick="state.screen='count';render()">← Back</button>
+    `;
+  }
+
+  return `
+    <div class="screen fade-in" style="padding-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <h2 style="font-family:var(--font-serif);font-size:28px;margin-bottom:4px">Player Setup</h2>
+          <p style="color:var(--text3);font-size:13px">Register players sitting clockwise around the table.</p>
+        </div>
+        <span class="phase-badge warn-red" style="font-size:11px">${entered}/${state.playerCount} Roster</span>
+      </div>
+
+      <div class="card" style="padding:16px;border-radius:12px;margin-bottom:24px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:12px">PLAYER ROSTER</div>
+        ${roster}
+      </div>
+
+      <button class="btn btn-primary" onclick="proceedToRoles()">Continue to Roles →</button>
+      <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='count';render()">← Back</button>
     </div>
-    <div style="margin-bottom:16px">${listBtns}</div>
-    ${loadPanel}
-    ${names.length < count ? `<div style="display:flex;gap:8px;margin-bottom:20px">
-      <input class="input" id="nameInput" placeholder="Enter player name..." value="${esc(state.nameInput)}"
-        onkeydown="if(event.key==='Enter')addName()" oninput="state.nameInput=this.value" style="flex:1">
-      <button class="btn btn-primary" style="width:auto;padding:10px 18px;background:${S().color}" onclick="addName()">Add</button>
-    </div>` : ""}
-    <div style="margin-bottom:20px">${list || '<div style="text-align:center;padding:32px;color:var(--text3);border:1px dashed var(--border);border-radius:8px">No players added yet</div>'}</div>
-    <button class="btn ${canProceed?'btn-primary':'btn-disabled'}" ${canProceed?"":'disabled'}
-      style="${canProceed?'background:'+S().color:''}"
-      onclick="goToCharacters()">
-      ${canProceed ? "Select Characters →" : `Add ${count - names.length} more player${count-names.length>1?"s":""}`}
-    </button>
-  </div>`;
+  `;
 }
 
-function addName() {
-  const n = state.nameInput.trim();
-  if (!n || state.names.length >= state.playerCount) return;
-  if (state.names.find(x => x.toLowerCase() === n.toLowerCase())) return;
-  state.names = [...state.names, n];
-  state.nameInput = "";
+function savePlayerName(idx, val) {
+  state.names[idx] = val;
+  autoSave();
+}
+
+function focusNextName(idx) {
+  const next = document.getElementById(`name-input-${idx + 1}`);
+  if (next) next.focus();
+}
+
+function proceedToRoles() {
+  // Ensure all names are filled out with defaults if missing
+  for (let i = 0; i < state.playerCount; i++) {
+    if (!state.names[i] || state.names[i].trim() === "") {
+      state.names[i] = `Player ${i + 1}`;
+    }
+  }
+
+  // Populate dynamic role pool based on active script character list
+  const d = state.dist || { t: 3, o: 0, m: 1, d: 1 };
+  
+  // Randomize initial pool from the script
+  const chars = S().C;
+  const tfKeys = Object.keys(chars).filter(k => chars[k].type === "townsfolk");
+  const osKeys = Object.keys(chars).filter(k => chars[k].type === "outsider");
+  const mnKeys = Object.keys(chars).filter(k => chars[k].type === "minion");
+  const dmKeys = Object.keys(chars).filter(k => chars[k].type === "demon");
+
+  // Pick correct count randomly
+  const chosenTF = shuffle(tfKeys).slice(0, d.t);
+  const chosenOS = shuffle(osKeys).slice(0, d.o);
+  const chosenMN = shuffle(mnKeys).slice(0, d.m);
+  const chosenDM = shuffle(dmKeys).slice(0, d.d ?? 1);
+
+  state.rolePool = [...chosenTF, ...chosenOS, ...chosenMN, ...chosenDM];
+  
+  // Empty assignments
+  state.assignments = {};
+  for (let i = 0; i < state.playerCount; i++) {
+    state.assignments[i] = "";
+  }
+
+  state.screen = "roles";
   autoSave();
   render();
 }
-function removeName(i) { state.names.splice(i, 1); autoSave(); render(); }
-function moveName(i, d) {
-  const a = [...state.names]; const t = i + d;
-  if (t < 0 || t >= a.length) return;
-  [a[i], a[t]] = [a[t], a[i]];
-  state.names = a; autoSave(); render();
-}
-function goToCharacters() {
-  state.screen = "characters";
-  state.selTF = []; state.selOS = []; state.selMN = [];
-  state.selDM = S().demonFixed ? [...S().defaultDemon] : [];
-  state.selTR = state.selTR || [];
-  state.travellerData = state.travellerData || [];
-  state.travellersToggle = state.travellersToggle ?? false;
-  state.drunkAs = ""; state.godfatherOutsiderMod = 0;
-  autoSave(); render();
-}
-
-function promptSaveList() {
-  const defaultName = `${state.playerCount}p — ${new Date().toLocaleDateString()}`;
-  const name = prompt("Save list as:", defaultName);
-  if (name) { savePlayerList(name); render(); }
-}
 
 // ══════════════════════════════════════════════════════════════════════════
-// SCREEN: Character Selection
+// FLOW 3: ROLE POOL & ASSIGNMENT SCREEN (`Role Assignment.png`)
 // ══════════════════════════════════════════════════════════════════════════
-function getAdjustedDist() {
+function renderRolesScreen() {
   const s = S();
-  const base = s.DIST[state.playerCount];
-  const d = { t: base.t, o: base.o, m: base.m, d: base.d };
-  if (state.scriptId === "tb") {
-    if (state.selMN.includes("baron")) { d.t -= 2; d.o += 2; }
-  } else {
-    // BMR: Godfather modifier
-    d.o += state.godfatherOutsiderMod;
-    d.t -= state.godfatherOutsiderMod;
-  }
-  return d;
-}
+  const chars = s.C;
 
-function renderCharScreen() {
-  const s = S(); const c = s.C;
-  const townsfolk = Object.values(c).filter(ch => ch.type === "townsfolk");
-  const outsiders = Object.values(c).filter(ch => ch.type === "outsider");
-  const minions = Object.values(c).filter(ch => ch.type === "minion");
-  const demons = Object.values(c).filter(ch => ch.type === "demon");
-  const travellers = Object.values(s.TRAVELLERS || {});
+  let playerRows = "";
+  for (let i = 0; i < state.playerCount; i++) {
+    const roleId = state.assignments[i];
+    const c = chars[roleId];
+    const isAssigned = !!c;
 
-  function chipSection(title, chars, sel, key) {
-    const type = key === "selMN" ? "minion" : key === "selOS" ? "outsider" : key === "selDM" ? "demon" : "townsfolk";
-    const clr = TYPE_CLR[type];
-    let chips = "";
-    chars.forEach(ch => {
-      const on = sel.includes(ch.id);
-      const roleImg = renderRoleImage(ch.id, type, 20, "vertical-align:middle;margin-right:6px");
-      chips += `<span class="role-chip" onclick="toggleRole('${key}','${ch.id}')"
-        style="border-color:${on?clr.bdr:'rgba(255,255,255,0.05)'};background:${on?clr.bg:'rgba(0,0,0,0.2)'};color:${on?clr.txt:'var(--text3)'};font-weight:${on?600:400};display:inline-flex;align-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">${roleImg}${ch.name}</span>`;
-    });
-    return `<div style="margin-bottom:20px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-weight:600;color:${clr.txt};font-size:14.5px;font-family:var(--font-serif)">${title}</span>
-        <span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;background:rgba(243,156,18,0.15);color:#f39c12">${sel.length}</span>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">${chips}</div>
-    </div>`;
-  }
-
-  // Demon section
-  let demonSection = "";
-  if (s.demonFixed) {
-    const clr = TYPE_CLR.demon;
-    demonSection = `<div style="margin-bottom:20px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-weight:600;color:${clr.txt};font-size:14.5px;font-family:var(--font-serif)">Demon</span>
-        <span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;background:rgba(243,156,18,0.15);color:#f39c12">1</span>
-      </div>
-      <span class="role-chip" style="border-color:${clr.bdr};background:${clr.bg};color:${clr.txt};font-weight:600;cursor:default;display:inline-flex;align-items:center">
-        ${renderRoleImage('imp', 'demon', 20, "vertical-align:middle;margin-right:6px")}Imp
-      </span>
-    </div>`;
-  } else {
-    demonSection = chipSection("Demon", demons, state.selDM, "selDM");
-  }
-
-  // Drunk picker (TB only)
-  let drunkPicker = "";
-  if (state.scriptId === "tb" && state.selOS.includes("drunk")) {
-    const availTF = townsfolk.filter(t => !state.selTF.includes(t.id));
-    let opts = '<option value="">Select a Townsfolk...</option>';
-    availTF.forEach(ch => { opts += `<option value="${ch.id}" ${state.drunkAs===ch.id?"selected":""}>${ch.name}</option>`; });
-    drunkPicker = `<div class="card" style="border-color:rgba(22,160,133,0.3);background:rgba(22,160,133,0.06);margin-bottom:20px">
-      <div style="font-weight:600;font-size:13px;color:var(--teal);margin-bottom:8px">🍺 The Drunk believes they are:</div>
-      <select class="input" onchange="state.drunkAs=this.value;autoSave();render()">${opts}</select>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px">This Townsfolk goes in the bag. The player thinks they ARE this Townsfolk.</div>
-    </div>`;
-  }
-
-  // Travellers toggle and section
-  let travellerSection = "";
-  if (!state.travellersToggle) {
-    // Clear Travellers if toggle is off
-    state.selTR = [];
-    state.travellerData = [];
-  } else if (travellers.length > 0) {
-    // Initialize Traveller selection state if needed
-    if (!state.selTR) state.selTR = [];
-    if (!state.travellerData) state.travellerData = [];
-    
-    // Ensure travellerData matches selTR
-    while (state.travellerData.length < state.selTR.length) {
-      state.travellerData.push({ character: state.selTR[state.travellerData.length], alignment: "good" });
+    let roleDisplay = "";
+    if (isAssigned) {
+      const colors = TYPE_CLR[c.type];
+      roleDisplay = `
+        <div style="display:flex;align-items:center;gap:8px;background:${colors.bg};border:1px solid ${colors.bdr}44;padding:4px 8px;border-radius:6px">
+          ${renderRoleImage(c.id, c.type, 20)}
+          <span style="font-size:12px;font-weight:700;color:${colors.txt}">${c.name}</span>
+          <span style="font-size:9px;text-transform:uppercase;color:var(--text3)">${c.type}</span>
+        </div>
+      `;
+    } else {
+      roleDisplay = `<span style="font-size:12px;color:var(--text3);font-style:italic">Unassigned</span>`;
     }
-    while (state.travellerData.length > state.selTR.length) {
-      state.travellerData.pop();
-    }
-    
-    let travellerChips = "";
-    travellers.forEach(tr => {
-      const on = state.selTR.includes(tr.id);
-      const travImg = renderRoleImage(tr.id, "traveller", 20, "vertical-align:middle;margin-right:6px");
-      travellerChips += `<span class="role-chip" onclick="toggleTraveller('${tr.id}')"
-        style="border-color:${on?'#f39c12':'rgba(255,255,255,0.05)'};background:${on?'rgba(243,156,18,0.12)':'rgba(0,0,0,0.2)'};color:${on?'#f39c12':'var(--text3)'};font-weight:${on?600:400};display:inline-flex;align-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">${travImg}${tr.name}</span>`;
-    });
-    
-    let travellerDetails = "";
-    state.travellerData.forEach((td, idx) => {
-      const travChar = travellers.find(t => t.id === td.character);
-      if (!travChar) return;
-      
-      const alignmentColor = td.alignment === "good" ? "#5dade2" : "#e74c3c";
-      const alignmentText = td.alignment === "good" ? "Good" : "Evil";
-      travellerDetails += `<div class="card" style="border-color:rgba(243,156,18,0.25);background:rgba(243,156,18,0.06);margin-bottom:10px;padding:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
-        <div style="font-weight:600;font-size:13px;color:#f39c12;margin-bottom:8px">${travChar.name}</div>
-        <div style="display:flex;gap:12px;align-items:center">
-          <span style="font-size:11px;color:var(--text2)">Will be randomly assigned from player list</span>
-          <button class="btn-outline" 
-            style="width:90px;font-size:12px;padding:6px 12px;margin-left:auto;margin:0;background:${alignmentColor}15;border-color:${alignmentColor};color:${alignmentColor};font-weight:600"
-            onclick="state.travellerData[${idx}].alignment=state.travellerData[${idx}].alignment==='good'?'evil':'good';autoSave();render()">
-            ${alignmentText}
+
+    playerRows += `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="seat-num" style="background:${isAssigned ? TYPE_CLR[c.type].bdr : 'var(--border)'};border:none">${i + 1}</div>
+          <span style="font-weight:600;font-size:14px;color:var(--text)">${esc(state.names[i])}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          ${roleDisplay}
+          <button class="btn-sm" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px" onclick="editPlayerRole(${i})">
+            ${isAssigned ? '⇄ Swap' : '+ Assign'}
           </button>
         </div>
-      </div>`;
-    });
-    
-    travellerSection = `<div style="margin-bottom:20px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-weight:600;color:#f39c12;font-size:14.5px;font-family:var(--font-serif)">🧳 Travellers (Optional)</span>
-        <span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;background:rgba(243,156,18,0.15);color:#f39c12">${state.selTR.length}</span>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">${travellerChips}</div>
-      ${travellerDetails}
-    </div>`;
+    `;
   }
 
-  // Validation - only require at least one demon (unless fixed)
-  const hasDrunk = state.scriptId === "tb" && state.selOS.includes("drunk");
-  
-  // Calculate total selected roles
-  const totalRoles = state.selTF.length + state.selOS.length + state.selMN.length + state.selDM.length;
-  const playerCount = state.playerCount || 0;
-  const rolesMatchPlayers = totalRoles === playerCount;
-  
-  const canProceed = (s.demonFixed || state.selDM.length > 0) && (!hasDrunk || state.drunkAs) && rolesMatchPlayers;
+  // Render pool stats
+  const poolCount = state.rolePool.length;
+  const assignedCount = Object.keys(state.assignments).filter(k => state.assignments[k] !== "").length;
 
-  return `<div class="screen${state._fadeIn?' fade-in':''}">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div>
-        <h2 style="font-size:22px;color:${s.color};font-family:var(--font-serif)">Select Characters</h2>
-        <p style="color:var(--text2);font-size:12px">${state.playerCount} players</p>
-      </div>
-      <button class="btn-outline" style="margin:0" onclick="state.screen='names';render()">← Back</button>
-    </div>
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px">
-      <button class="btn btn-blue" style="flex:1" onclick="randomizeRoles()">🎲 Randomize All</button>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px;color:var(--text2)" onclick="state.travellersToggle=!state.travellersToggle;autoSave();render()">
-        <span>🧳 Travellers</span>
-        <div style="position:relative;width:40px;height:20px;background:${state.travellersToggle?'#f39c12':'var(--border)'};border-radius:10px;transition:background 0.2s;cursor:pointer">
-          <div style="position:absolute;top:2px;left:${state.travellersToggle?'22px':'2px'};width:16px;height:16px;background:#fff;border-radius:50%;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
+  return `
+    <div class="screen fade-in" style="padding-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div>
+          <h2 style="font-family:var(--font-serif);font-size:28px;margin-bottom:4px">Role Assignment</h2>
+          <p style="color:var(--text3);font-size:13px">Distribute role tokens to the roster.</p>
         </div>
-      </label>
-    </div>
-    ${chipSection("Townsfolk", townsfolk, state.selTF, "selTF")}
-    ${chipSection("Outsiders", outsiders, state.selOS, "selOS")}
-    ${chipSection("Minions", minions, state.selMN, "selMN")}
-    ${demonSection}
-    ${drunkPicker}
-    ${travellerSection}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:12px">
-      <div style="flex:1"></div>
-      <div style="font-size:14px;font-weight:700;color:${rolesMatchPlayers?'var(--green)':'var(--red)'};padding:4px 12px;border-radius:6px;background:${rolesMatchPlayers?'rgba(39,174,96,0.12)':'rgba(184,29,36,0.12)'};border:1px solid ${rolesMatchPlayers?'var(--green)33':'var(--red)33'}">
-        ${totalRoles}/${playerCount}
+        <button class="btn-outline" style="padding:6px 12px;font-size:11px" onclick="randomizeAssignments()">🔀 Randomize All</button>
       </div>
-    </div>
-    <button class="btn ${canProceed?'btn-primary':'btn-disabled'}" ${canProceed?"":'disabled'}
-      style="${canProceed?'background:'+s.color:''}"
-      onclick="assignAndShowRoles()">
-      ${canProceed?"Assign Roles & Start 🎭":(hasDrunk && !state.drunkAs ? "Select Drunk's false role" : rolesMatchPlayers ? "Select at least one Demon" : `Select ${Math.abs(playerCount - totalRoles)} more role${Math.abs(playerCount - totalRoles) === 1 ? '' : 's'}`)}
-    </button>
-  </div>`;
-}
 
-function toggleRole(key, id) {
-  const arr = [...state[key]];
-  const idx = arr.indexOf(id);
-  if (idx >= 0) arr.splice(idx, 1); else arr.push(id);
-  state[key] = arr;
-  // Reset Godfather mod if removed
-  if (key === "selMN" && id === "godfather" && idx >= 0) {
-    state.godfatherOutsiderMod = 0;
-  }
-  // Reset drunkAs if Drunk removed
-  if (key === "selOS" && id === "drunk" && idx >= 0) {
-    state.drunkAs = "";
-  }
-  autoSave(); render();
-}
-
-function toggleTraveller(id) {
-  if (!state.selTR) state.selTR = [];
-  if (!state.travellerData) state.travellerData = [];
-  
-  const arr = [...state.selTR];
-  const idx = arr.indexOf(id);
-  
-  if (idx >= 0) {
-    // Remove Traveller
-    arr.splice(idx, 1);
-    // Remove corresponding travellerData entry
-    if (state.travellerData.length > idx) {
-      state.travellerData.splice(idx, 1);
-    }
-  } else {
-    // Add Traveller
-    arr.push(id);
-    // Add corresponding travellerData entry
-    state.travellerData.push({ character: id, alignment: "good" });
-  }
-  
-  state.selTR = arr;
-  autoSave(); render();
-}
-
-function randomizeRoles() {
-  const s = S(); const c = s.C;
-  const playerCount = state.playerCount || 0;
-
-  const allTF = Object.values(c).filter(ch => ch.type === "townsfolk").map(ch => ch.id);
-  const allOS = Object.values(c).filter(ch => ch.type === "outsider").map(ch => ch.id);
-  const allMN = Object.values(c).filter(ch => ch.type === "minion").map(ch => ch.id);
-  const allDM = Object.values(c).filter(ch => ch.type === "demon").map(ch => ch.id);
-  const allTR = state.travellersToggle ? Object.values(s.TRAVELLERS || {}).map(ch => ch.id) : [];
-
-  // Calculate how many roles we need
-  let rolesNeeded = playerCount;
-  let travellerCount = 0;
-  
-  // If Travellers toggle is on, randomly select some Travellers
-  if (state.travellersToggle && allTR.length > 0 && playerCount > 1) {
-    // Randomly select 0-3 Travellers (or up to 1/3 of players, but leave at least 2 roles for regular players)
-    const maxTravellers = Math.min(3, Math.max(0, Math.floor(playerCount / 3)), allTR.length, playerCount - 2);
-    travellerCount = Math.floor(Math.random() * (maxTravellers + 1));
-    rolesNeeded -= travellerCount;
-  }
-
-  // Pick demon first - at least one required
-  let selDM;
-  if (s.demonFixed) {
-    selDM = [...s.defaultDemon];
-    rolesNeeded -= selDM.length;
-  } else {
-    // Select 1 demon (required)
-    selDM = [shuffle(allDM)[0]];
-    rolesNeeded -= 1;
-  }
-
-  // Ensure we have enough roles left for at least some Townsfolk
-  rolesNeeded = Math.max(1, rolesNeeded);
-
-  // Distribute remaining roles randomly among TF, OS, MN
-  // Ensure we have at least some Townsfolk for balance
-  const minTownsfolk = Math.max(1, Math.floor(rolesNeeded * 0.4));
-  const maxTownsfolk = Math.min(allTF.length, Math.floor(rolesNeeded * 0.7));
-  const townsfolkCount = Math.floor(Math.random() * (maxTownsfolk - minTownsfolk + 1)) + minTownsfolk;
-  rolesNeeded -= townsfolkCount;
-
-  // Remaining roles split between Outsiders and Minions
-  const remainingRoles = Math.max(0, rolesNeeded);
-  const minionCount = Math.floor(Math.random() * (remainingRoles + 1));
-  const outsiderCount = remainingRoles - minionCount;
-
-  let selTF = shuffle(allTF).slice(0, Math.min(townsfolkCount, allTF.length));
-  let selMN = shuffle(allMN).slice(0, Math.min(minionCount, allMN.length));
-  let selOS = shuffle(allOS).slice(0, Math.min(outsiderCount, allOS.length));
-
-  // Calculate current total and adjust to match playerCount exactly
-  let totalSelected = selTF.length + selOS.length + selMN.length + selDM.length + travellerCount;
-  let stillNeeded = playerCount - totalSelected;
-  
-  // Fill remaining roles with Townsfolk first, then Outsiders, then Minions
-  if (stillNeeded > 0) {
-    const remainingTF = allTF.filter(id => !selTF.includes(id));
-    const remainingOS = allOS.filter(id => !selOS.includes(id));
-    const remainingMN = allMN.filter(id => !selMN.includes(id));
-    
-    const addTF = Math.min(stillNeeded, remainingTF.length);
-    selTF.push(...shuffle(remainingTF).slice(0, addTF));
-    stillNeeded -= addTF;
-    
-    if (stillNeeded > 0) {
-      const addOS = Math.min(stillNeeded, remainingOS.length);
-      selOS.push(...shuffle(remainingOS).slice(0, addOS));
-      stillNeeded -= addOS;
-    }
-    
-    if (stillNeeded > 0) {
-      const addMN = Math.min(stillNeeded, remainingMN.length);
-      selMN.push(...shuffle(remainingMN).slice(0, addMN));
-      stillNeeded -= addMN;
-  }
-  } else if (stillNeeded < 0) {
-    // Too many roles selected, remove excess (prefer removing from TF, then OS, then MN)
-    let toRemove = -stillNeeded;
-    while (toRemove > 0 && selTF.length > 1) {
-      selTF.pop();
-      toRemove--;
-    }
-    while (toRemove > 0 && selOS.length > 0) {
-      selOS.pop();
-      toRemove--;
-    }
-    while (toRemove > 0 && selMN.length > 0) {
-      selMN.pop();
-      toRemove--;
-    }
-  }
-
-  // Select Travellers if toggle is on
-  let selTR = [];
-  let travellerData = [];
-  if (state.travellersToggle && travellerCount > 0 && allTR.length > 0) {
-    selTR = shuffle(allTR).slice(0, Math.min(travellerCount, allTR.length));
-    travellerData = selTR.map(charId => ({
-      character: charId,
-      alignment: Math.random() > 0.5 ? "good" : "evil"
-    }));
-  }
-
-  // Drunk-believes-as for TB
-  let drunkAs = "";
-  if (state.scriptId === "tb" && selOS.includes("drunk")) {
-    const remaining = allTF.filter(id => !selTF.includes(id));
-    if (remaining.length > 0) drunkAs = shuffle(remaining)[0];
-  }
-
-  state.selTF = selTF; 
-  state.selOS = selOS; 
-  state.selMN = selMN; 
-  state.selDM = selDM;
-  state.selTR = selTR;
-  state.travellerData = travellerData;
-  state.drunkAs = drunkAs;
-  state.godfatherOutsiderMod = 0;
-  autoSave(); render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// ROLE ASSIGNMENT + GAME STATE CREATION
-// ══════════════════════════════════════════════════════════════════════════
-function goToTravellers() {
-  state.screen = "travellers";
-  // Initialize travellers array if not already set
-  if (!state.travellers) {
-    state.travellers = [];
-  }
-  autoSave();
-  render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// SCREEN: Travellers Selection
-// ══════════════════════════════════════════════════════════════════════════
-function renderTravellersScreen() {
-  const s = S();
-  const travellers = s.TRAVELLERS || {};
-  const travellerList = Object.values(travellers);
-  
-  let travellerCards = "";
-  if (state.travellers && state.travellers.length > 0) {
-    state.travellers.forEach((t, i) => {
-      const travChar = travellers[t.character];
-      const alignmentColor = t.alignment === "good" ? "#5dade2" : "#e74c3c";
-      const travImg = renderRoleImage(t.character, "traveller", 40, "margin-right:8px");
-      
-      travellerCards += `<div class="card" style="border-color:rgba(243,156,18,0.3);background:rgba(243,156,18,0.08);margin-bottom:8px;display:flex;align-items:center;gap:10px">
-        ${travImg}
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:14px;color:var(--text)">${esc(t.name)}</div>
-          <div style="font-size:11px;color:#f39c12">${travChar?.name || t.character}</div>
-          <div style="font-size:11px;color:${alignmentColor}">${t.alignment === "good" ? "Good" : "Evil"}</div>
+      <!-- Role Pool Display Card -->
+      <div class="card" style="padding:14px;border-radius:12px;margin-bottom:16px;background:rgba(0,0,0,0.1)">
+        <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">
+          <span>Target Pool (${poolCount} Roles Selected)</span>
+          <button style="background:none;border:none;color:${s.color};font-size:11px;font-weight:700;cursor:pointer" onclick="openPoolEditor()">✎ Customize Pool</button>
         </div>
-        <button class="btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);border-color:var(--red)" onclick="removeTravellerSetup(${i})">✕</button>
-      </div>`;
-    });
-  } else {
-    travellerCards = `<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">No Travellers added yet</div>`;
-  }
-  
-  return `<div class="screen${state._fadeIn?' fade-in':''}">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div>
-        <h2 style="font-size:18px;color:${s.color}">🧳 Travellers</h2>
-        <p style="color:var(--text2);font-size:12px">Optional: Add Travellers for late joiners or early leavers</p>
-      </div>
-      <button class="btn-outline" onclick="state.screen='characters';render()">← Back</button>
-    </div>
-    
-    <div style="margin-bottom:16px">
-      <button class="btn-outline" style="width:100%;color:#f39c12;border-color:rgba(243,156,18,0.3);margin-bottom:12px" onclick="addTravellerSetup()">+ Add Traveller</button>
-      ${travellerCards}
-    </div>
-    
-    <button class="btn btn-primary" style="background:${s.color};width:100%" onclick="assignAndShowRoles()">
-      🎭 Assign Roles & Start
-    </button>
-  </div>`;
-}
-
-function addTravellerSetup() {
-  const s = S();
-  const travellers = s.TRAVELLERS || {};
-  const travellerList = Object.values(travellers);
-  
-  if (travellerList.length === 0) {
-    alert("No Travellers available for this script.");
-    return;
-  }
-  
-  const name = prompt("Enter Traveller name:");
-  if (!name || !name.trim()) return;
-  
-  let charList = travellerList.map((t, i) => `${i+1}. ${t.name}`).join("\n");
-  const charId = prompt(`Select Traveller character:\n${charList}\n\nEnter number (1-${travellerList.length}):`);
-  if (!charId) return;
-  
-  const charIdx = parseInt(charId) - 1;
-  if (charIdx < 0 || charIdx >= travellerList.length) {
-    alert("Invalid selection.");
-    return;
-  }
-  
-  const selectedChar = travellerList[charIdx];
-  const alignment = confirm("Is this Traveller Good? (OK = Good, Cancel = Evil)") ? "good" : "evil";
-  
-  const maxSeat = Math.max(...(state.travellers || []).map(t => t.seat || 0), state.playerCount || 0);
-  const newTraveller = {
-    name: name.trim(),
-    character: selectedChar.id,
-    alignment: alignment,
-    seat: maxSeat + 1,
-    alive: true,
-    exiled: false,
-    notes: "",
-  };
-  
-  state.travellers = [...(state.travellers || []), newTraveller];
-  autoSave();
-  render();
-}
-
-function removeTravellerSetup(i) {
-  if (confirm(`Remove Traveller "${state.travellers[i].name}"?`)) {
-    state.travellers.splice(i, 1);
-    autoSave();
-    render();
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// ROLE ASSIGNMENT + GAME STATE CREATION
-// ══════════════════════════════════════════════════════════════════════════
-function assignAndShowRoles() {
-  const s = S(); const c = s.C;
-  const hasDrunk = state.scriptId === "tb" && state.selOS.includes("drunk");
-  
-  // Build Travellers from travellerData - randomly assign names from player list
-  state.travellers = [];
-  let travellerNames = [];
-  if (state.travellerData && state.travellerData.length > 0) {
-    state.travellersEnabled = true;
-    
-    // Shuffle player names and randomly assign to Travellers
-    const shuffledNames = shuffle([...state.names]);
-    
-    state.travellerData.forEach((td, idx) => {
-      if (td.character && shuffledNames[idx]) {
-        const assignedName = shuffledNames[idx];
-        travellerNames.push(assignedName);
         
-        // Find the seat number for this Traveller
-        const seatNum = state.names.indexOf(assignedName) + 1;
-        
-        state.travellers.push({
-          name: assignedName,
-          character: td.character,
-          alignment: td.alignment || "good",
-          seat: seatNum,
-          alive: true,
-          exiled: false,
-          notes: "",
-        });
-      }
-    });
-  } else {
-    state.travellersEnabled = false;
-  }
-
-  // Build role pool - we need enough roles for non-Traveller players
-  const pool = [...state.selTF, ...state.selOS.filter(id => id !== "drunk"), ...state.selMN, ...state.selDM];
-  if (hasDrunk) pool.push("drunk");
-  const shuffled = shuffle(pool);
-
-  // Create players - Travellers don't get regular roles
-  const regularPlayers = state.names.filter(name => !travellerNames.includes(name));
-  let roleIndex = 0;
-  
-  const players = state.names.map((name, i) => {
-    // If this player is a Traveller, they don't get a regular role
-    if (travellerNames.includes(name)) {
-      return {
-        name, seat: i + 1, actual: null,
-        believed: null,
-        alive: true, ghostVote: false, ghostUsed: false,
-        poisoned: false, protected: false, daProtected: false,
-        poisonSource: null, drunkSource: null, notes: "",
-        abilityUsed: false, master: null,
-        // BMR-specific
-        foolLifeUsed: false, zombuulUndead: false,
-        isTraveller: true,
-      };
-    }
-    
-    // Regular players get roles from the shuffled pool
-    const roleId = shuffled[roleIndex];
-    roleIndex++;
-    return {
-      name, seat: i + 1, actual: roleId,
-      believed: (roleId === "drunk" && state.drunkAs) ? state.drunkAs : roleId,
-      alive: true, ghostVote: false, ghostUsed: false,
-      poisoned: false, protected: false, daProtected: false,
-      poisonSource: null, drunkSource: null, notes: "",
-      abilityUsed: false, master: null,
-      // BMR-specific
-      foolLifeUsed: false, zombuulUndead: false,
-    };
-  });
-
-  // Generate 3 bluffs (good characters not in play)
-  const goodInPlay = [...state.selTF, ...state.selOS];
-  if (hasDrunk && state.drunkAs) goodInPlay.push(state.drunkAs);
-  const allGood = Object.values(c).filter(ch => ch.team === "good").map(ch => ch.id);
-  const notInPlay = allGood.filter(id => !goodInPlay.includes(id));
-  const bluffs = shuffle(notInPlay).slice(0, 3);
-
-  // Script-specific game state
-  let extra = {};
-  if (state.scriptId === "tb") {
-    // Red Herring: random good player for Fortune Teller
-    const hasFT = state.selTF.includes("fortuneteller") || (hasDrunk && state.drunkAs === "fortuneteller");
-    const goodPlayers = players.filter(p => c[p.actual]?.team === "good");
-    extra.redHerring = hasFT && goodPlayers.length > 0
-      ? goodPlayers[Math.floor(Math.random() * goodPlayers.length)].seat - 1
-      : -1;
-    extra.drunkAs = hasDrunk ? state.drunkAs : null;
-  } else {
-    // BMR specifics
-    extra.demonType = state.selDM[0];
-    extra.poCharged = false;
-    extra.pukkaVictimIdx = -1;
-    extra.courtierTarget = null;
-    extra.courtierTimer = 0;
-    extra.courtierUsed = false;
-    extra.exorcistTarget = -1;
-    extra.daTarget = -1;
-    extra.daLastTarget = -1;
-    extra.assassinUsed = false;
-    extra.professorUsed = false;
-    extra.minstrelAllDrunk = false;
-    extra.mastermindDay = false;
-    extra.gossipStatements = [];
-    // Grandmother: assign grandchild (random good player, not Grandmother)
-    const grandmotherIdx = players.findIndex(p => p.actual === "grandmother");
-    if (grandmotherIdx >= 0) {
-      const goodOthers = players.filter((p, i) => i !== grandmotherIdx && c[p.actual]?.team === "good");
-      extra.grandchildIdx = goodOthers.length > 0 ? players.indexOf(goodOthers[Math.floor(Math.random() * goodOthers.length)]) : -1;
-    } else {
-      extra.grandchildIdx = -1;
-    }
-    // Outsiders in play (for Godfather info)
-    extra.outsidersInPlay = players.filter(p => c[p.actual]?.type === "outsider").map(p => p.actual);
-  }
-
-  // Create game state
-  const gs = {
-    players, phase: "night", dayNum: 1, isFirstNight: true,
-    executedToday: null, diedTonight: [], bluffs,
-    log: [], nightKillDone: false,
-    exiledToday: null, // For Travellers
-    ...extra,
-  };
-
-  state.gs = gs;
-  state.screen = "showroles";
-  state.tab = "grimoire";
-  state.expandedPlayer = -1;
-  state.expandedTraveller = -1;
-  state.nightStep = 0;
-  state.showingRoleFor = -1;
-  state.showCard = null;
-  state.rolesShown = [];
-  autoSave(); render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// SCREEN: Show Roles
-// ══════════════════════════════════════════════════════════════════════════
-function renderShowRolesScreen() {
-  const gs = state.gs;
-  const s = S(); const c = s.C;
-
-  let html = `<div class="screen${state._fadeIn?' fade-in':''}">
-    <h2 style="font-size:22px;color:${s.color};margin-bottom:8px;font-family:var(--font-serif)">🎭 Show Role Cards</h2>
-    <p style="color:var(--text2);font-size:13px;margin-bottom:20px">Tap each player to show them their role privately. The Drunk sees their believed Townsfolk.</p>`;
-
-  // TB: Red Herring picker
-  if (state.scriptId === "tb" && gs.redHerring !== undefined) {
-    const hasFT = gs.players.some(p => p.actual === "fortuneteller" || (p.actual === "drunk" && p.believed === "fortuneteller"));
-    if (hasFT) {
-      const goodPlayers = gs.players.map((p,i) => ({...p,i})).filter(p => c[p.actual]?.team === "good");
-      let rhOpts = "";
-      goodPlayers.forEach(p => {
-        rhOpts += `<option value="${p.i}" ${gs.redHerring===p.i?"selected":""}>${p.name} (Seat ${p.i+1} — ${c[p.actual]?.name}${p.actual==="drunk"?" / Drunk":""})</option>`;
-      });
-      html += `<div class="card" style="border-color:rgba(184,29,36,0.3);background:rgba(184,29,36,0.06);margin-bottom:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
-        <div style="font-weight:600;font-size:13px;color:var(--red);margin-bottom:6px;font-family:var(--font-serif)">🎯 Fortune Teller — Red Herring</div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">This good player always registers as the Demon. Persists all game.</div>
-        <select class="input" onchange="setRedHerring(parseInt(this.value))">${rhOpts}</select>
-      </div>`;
-    }
-  }
-
-  // BMR: Show grandchild assignment
-  if (state.scriptId === "bmr" && gs.grandchildIdx >= 0) {
-    const grandma = gs.players.find(p => p.actual === "grandmother");
-    const grandchild = gs.players[gs.grandchildIdx];
-    if (grandma && grandchild) {
-      html += `<div class="card" style="border-color:rgba(41,128,185,0.3);background:rgba(41,128,185,0.06);margin-bottom:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
-        <div style="font-weight:600;font-size:13px;color:var(--blue);margin-bottom:6px;font-family:var(--font-serif)">👵 Grandmother's Grandchild</div>
-        <div style="font-size:13px;color:var(--text);font-weight:600">${grandchild.name} (Seat ${grandchild.seat}) — ${c[grandchild.actual]?.name}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:6px">Grandmother will be told this during First Night. If Demon kills the grandchild, Grandmother dies too.</div>
-      </div>`;
-    }
-  }
-
-  // Player list
-  gs.players.forEach((p, i) => {
-    const ch = c[p.actual];
-    const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
-    const clr = TYPE_CLR[showCh?.type || "townsfolk"];
-    const shown = state.rolesShown.includes(i);
-    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 28, "margin-right:4px");
-    html += `<div onclick="showRoleTo(${i})" style="padding:12px 14px;margin-bottom:6px;border-radius:8px;border:1px solid ${clr.bdr}33;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);transition:opacity 0.2s;${shown?'opacity:0.5':''}">
-      <span class="seat-num" style="background:${clr.bdr};margin:0">${i+1}</span>
-      ${roleImg}
-      <span style="flex:1;font-weight:600;font-size:14px;color:var(--text)">${esc(p.name)}</span>
-      <span style="font-size:18px">${TEMOJI[showCh?.type||"townsfolk"]}</span>
-      <span style="color:var(--text3);font-size:13px;font-weight:600">${shown?"✓ DONE":"👁️ REVEAL"}</span>
-    </div>`;
-  });
-
-  const allShown = state.rolesShown.length >= gs.players.length;
-  html += `<div style="margin-top:24px">
-    <button class="btn btn-night" style="padding:14px;margin:0" onclick="state.screen='game';autoSave();render()">
-      ${allShown ? "✅ Begin Night 1" : "⚠️ Begin Night 1 (Unrevealed Roles)"}
-    </button>
-  </div></div>`;
-  return html;
-}
-
-function showRoleTo(i) {
-  state.showingRoleFor = i;
-  if (!state.rolesShown.includes(i)) state.rolesShown = [...state.rolesShown, i];
-  autoSave(); render();
-}
-
-function setRedHerring(idx) {
-  if (!state.gs) return;
-  state.gs.redHerring = idx;
-  autoSave(); render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// SCREEN: Game
-// ══════════════════════════════════════════════════════════════════════════
-function renderGameScreen() {
-  const gs = state.gs;
-  if (!gs) return `<div class="screen">No game state</div>`;
-  const alive = gs.players.filter(p => p.alive).length;
-  const majority = Math.ceil(alive / 2);
-  const ghostsLeft = gs.players.filter(p => !p.alive && p.ghostVote && !p.ghostUsed).length;
-
-  let tabs = "";
-  const tabList = [
-    {id:"grimoire",l:"📖 Grim"},{id:"night",l:"🌙 Night"},
-    {id:"day",l:"☀️ Day"},{id:"roles",l:"🎭 Roles"},{id:"log",l:"📝 Log"}
-  ];
-  tabList.forEach(t => {
-    tabs += `<button class="tab ${state.tab===t.id?'active':''}" onclick="state.tab='${t.id}';render()">${t.l}</button>`;
-  });
-
-  let content = "";
-  switch (state.tab) {
-    case "grimoire": content = renderGrimoire(); break;
-    case "night": content = renderNightWalker(); break;
-    case "day": content = renderDayPhase(); break;
-    case "roles": content = renderRolesRef(); break;
-    case "log": content = renderLog(); break;
-  }
-
-  // Bottom bar
-  const hasUndo = state.undoStack.length > 0;
-  const undoBtn = hasUndo ? `<button class="btn" style="width:auto;padding:12px 16px;background:var(--surface-bright);color:var(--orange);border:1px solid var(--border);font-size:18px;border-radius:8px;margin:0" onclick="undoAction()" title="Undo">↩</button>` : "";
-
-  let bottomBtns = "";
-  if (gs.phase === "day") {
-    const nextN = gs.dayNum + 1;
-    bottomBtns = `${undoBtn}<button class="btn btn-night" style="flex:1;margin:0" onclick="confirmAction('startNight','Begin Night ${nextN}? Make sure all day actions are done.')">🌙 Begin Night ${nextN}</button>`;
-  } else {
-    bottomBtns = `${undoBtn}
-      <button class="btn btn-night" style="flex:1;margin:0" onclick="state.tab='night';render()">🌙 Night Walker</button>
-      <button class="btn btn-day" style="flex:1;margin:0" onclick="confirmAction('startDay','Advance to Day? Make sure all night steps are done.')">☀️ Dawn</button>`;
-  }
-
-  // Win overlay
-  let winOverlay = "";
-  if (state.winMsg) {
-    const w = state.winMsg;
-    winOverlay = `<div class="overlay" onclick="state.winMsg=null;render()">
-      <div class="overlay-box" style="border:2px solid ${w.team==='good'?'#2980b9':'#e74c3c'};background:var(--surface2)">
-        <div style="font-size:48px;margin-bottom:12px">${w.team==='good'?'😇':'😈'}</div>
-        <div style="font-size:24px;font-weight:700;color:${w.team==='good'?'#5dade2':'#e74c3c'};margin-bottom:8px;font-family:var(--font-serif)">${w.team==='good'?'GOOD':'EVIL'} WINS!</div>
-        <div style="font-size:14px;color:var(--text2);margin-bottom:16px">${w.reason}</div>
-        <div style="font-size:12px;color:var(--text3)">Tap to dismiss</div>
-      </div>
-    </div>`;
-  }
-
-  return `<div class="tabs">${tabs}</div>
-    <div class="status-bar">
-      <span style="color:var(--green);background:rgba(45,90,39,0.12);border:1px solid rgba(45,90,39,0.25);padding:4px 10px;border-radius:6px;font-weight:700">👤 ALIVE: ${alive}</span>
-      <span style="color:var(--red);background:rgba(184,29,36,0.12);border:1px solid rgba(184,29,36,0.25);padding:4px 10px;border-radius:6px;font-weight:700">💀 DEAD: ${gs.players.length - alive}</span>
-      <span style="color:var(--orange);background:rgba(243,156,18,0.12);border:1px solid rgba(243,156,18,0.25);padding:4px 10px;border-radius:6px;font-weight:700">🗳️ MIN VOTES: ${majority}</span>
-      <span style="color:var(--teal);background:rgba(223,188,217,0.12);border:1px solid rgba(223,188,217,0.25);padding:4px 10px;border-radius:6px;font-weight:700">👻 GHOST VOTES: ${ghostsLeft}</span>
-    </div>
-    <div style="padding-bottom:100px">${content}</div>
-    <div class="bottom-bar">${bottomBtns}</div>
-    ${winOverlay}`;
-}
-
-function confirmAction(fn, msg) {
-  state.confirm = { msg, onYes: fn };
-  render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// PHASE TRANSITIONS
-// ══════════════════════════════════════════════════════════════════════════
-function startDay() {
-  pushUndo();
-  const gs = state.gs;
-  gs.phase = "day";
-  gs.executedToday = null;
-  gs.exiledToday = null;
-  gs.nightKillDone = false;
-  gs.isFirstNight = false;
-  if (state.scriptId === "bmr") {
-    gs.minstrelAllDrunk = false;
-    gs.mastermindDay = false;
-  }
-  state.nightStep = 0;
-  state.tab = "grimoire";
-  state.confirm = null;
-  // Init timer
-  initTimer();
-  autoSave(); render();
-}
-
-function startNight() {
-  // Mayor check: 3 alive + no execution = good wins
-  checkMayorWin();
-  if (state.winMsg) return;
-  pushUndo();
-  const gs = state.gs;
-  gs.phase = "night";
-  gs.dayNum += 1;
-  gs.isFirstNight = false;
-  gs.diedTonight = [];
-  gs.nightKillDone = false;
-  // Clear protections
-  gs.players.forEach(p => {
-    p.protected = false;
-    p.daProtected = false;
-  });
-  // TB: Clear Poisoner's poison (will be re-applied at Poisoner step)
-  if (state.scriptId === "tb") {
-    gs.players.forEach(p => {
-      if (p.poisonSource === "poisoner") { p.poisoned = false; p.poisonSource = null; }
-    });
-  }
-  // BMR cleanup
-  if (state.scriptId === "bmr") {
-    // Clear Innkeeper protections + drunk
-    gs.players.forEach(p => {
-      if (p.drunkSource === "Innkeeper") p.drunkSource = null;
-      // Clear Sailor drunk (re-applied at Sailor step)
-      if (p.drunkSource === "Sailor") p.drunkSource = null;
-    });
-    // Courtier timer tick
-    if (gs.courtierTimer > 0) {
-      gs.courtierTimer--;
-      if (gs.courtierTimer <= 0) {
-        // Remove Courtier drunk from the target
-        gs.players.forEach(p => {
-          if (p.drunkSource === "Courtier") p.drunkSource = null;
-        });
-        gs.courtierTarget = null;
-        gs.log.push(`Night ${gs.dayNum}: Courtier's 3-night drunk expired.`);
-      }
-    }
-    gs.exorcistTarget = -1;
-    if (gs.daTarget >= 0) gs.daLastTarget = gs.daTarget;
-    gs.daTarget = -1;
-  }
-  state.nightStep = 0;
-  state.nightStepData = {}; // Reset step-specific data (innkeeper picks, po kills, etc.)
-  state.tab = "grimoire";
-  state.confirm = null;
-  stopTimer();
-  autoSave(); render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// GRIMOIRE TAB
-// ══════════════════════════════════════════════════════════════════════════
-function renderGrimoire() {
-  const gs = state.gs;
-  const s = S(); const c = s.C;
-  const isNight = gs.phase === "night";
-  const isDay = gs.phase === "day";
-
-  let html = `<div style="padding:12px">`;
-
-  // Bluffs + script info
-  html += `<div class="card" style="border-color:rgba(231,76,60,0.2);background:rgba(90,26,26,0.15);font-size:12px;margin-bottom:8px">
-    <span style="font-weight:600;color:var(--red)">🃏 Bluffs: </span>
-    ${gs.bluffs.map(b => c[b]?.name || b).join(", ")}`;
-  if (state.scriptId === "tb" && gs.redHerring >= 0) {
-    html += `<br><span style="font-weight:600;color:var(--orange)">🎯 Red Herring: </span>${gs.players[gs.redHerring]?.name} (Seat ${gs.redHerring+1})`;
-  }
-  if (state.scriptId === "bmr") {
-    html += `<br><span style="font-weight:600;color:var(--purple)">👹 Demon: </span>${c[gs.demonType]?.name || gs.demonType}`;
-    if (gs.grandchildIdx >= 0) {
-      html += `<br><span style="font-weight:600;color:var(--blue)">👵 Grandchild: </span>${gs.players[gs.grandchildIdx]?.name}`;
-    }
-  }
-  html += `</div>`;
-
-  // Night kill status
-  if (isNight && !gs.isFirstNight) {
-    if (gs.nightKillDone) {
-      const killNames = gs.diedTonight.length > 0
-        ? gs.players.filter((_,i) => gs.diedTonight.includes(i)).map(p => p.name).join(", ")
-        : "blocked";
-      html += `<div class="warn warn-red" style="margin-bottom:8px">💀 Night kill: ${killNames}</div>`;
-    } else {
-      html += `<button class="btn-outline" style="width:100%;margin-bottom:8px;color:var(--green);border-color:rgba(39,174,96,0.3);font-size:12px" onclick="markNoDeath()">🛡️ No death tonight (kill blocked)</button>`;
-    }
-  }
-
-  // Player cards
-  gs.players.forEach((p, i) => {
-    const ch = c[p.actual];
-    const clr = TYPE_CLR[ch?.type || "townsfolk"];
-    const isDrunk = p.actual === "drunk";
-    const isExp = state.expandedPlayer === i;
-
-    let badges = "";
-    if (p.poisoned) badges += '<span title="Poisoned">☠️</span>';
-    if (p.protected) badges += '<span title="Protected">🛡️</span>';
-    if (p.daProtected) badges += '<span title="DA Protected">⚖️</span>';
-    if (p.drunkSource) badges += '<span title="Drunk">🍺</span>';
-
-    let expanded = "";
-    if (isExp) {
-      const bch = isDrunk ? c[p.believed] : null;
-      const abilityText = isDrunk
-        ? `<strong style="color:var(--teal)">ACTUAL:</strong> Drunk<br><strong style="color:var(--blue)">BELIEVES (${bch?.name}):</strong> ${esc(bch?.ab||"")}`
-        : esc(ch?.ab || "");
-
-      let actions = "";
-      if (p.alive) {
-        // Execute: always available
-        actions += `<button class="btn-sm" style="background:rgba(243,156,18,0.12);color:var(--orange)" onclick="executePlayer(${i})">⚖️ Execute</button> `;
-        // Kill: night only, not first night
-        if (isNight && !gs.isFirstNight && !gs.nightKillDone) {
-          actions += `<button class="btn-sm" style="background:rgba(231,76,60,0.12);color:var(--red)" onclick="killPlayer(${i})">💀 Kill</button> `;
-        }
-        // Toggles
-        actions += `<button class="btn-sm" style="background:${p.poisoned?'rgba(39,174,96,0.12)':'rgba(155,89,182,0.12)'};color:${p.poisoned?'var(--green)':'var(--purple)'}" onclick="togglePoison(${i})">${p.poisoned?'💊 Cure':'☠️ Poison'}</button> `;
-        actions += `<button class="btn-sm" style="background:${p.protected?'rgba(39,174,96,0.12)':'rgba(41,128,185,0.12)'};color:${p.protected?'var(--green)':'var(--blue)'}" onclick="toggleProtect(${i})">${p.protected?'🛡️ Unprotect':'🛡️ Protect'}</button> `;
-      } else {
-        actions = `<button class="btn-sm" style="background:rgba(39,174,96,0.12);color:var(--green)" onclick="revivePlayer(${i})">✨ Revive</button> `;
-        if (p.ghostVote && !p.ghostUsed) {
-          actions += `<button class="btn-sm" style="background:rgba(155,89,182,0.12);color:var(--purple)" onclick="useGhostVote(${i})">👻 Use Vote</button> `;
-        }
-      }
-
-      expanded = `<div class="player-expand">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;line-height:1.4">${abilityText}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${actions}</div>
-        <textarea class="input" style="font-size:11px;min-height:36px;resize:vertical" placeholder="Notes..."
-          oninput="state.gs.players[${i}].notes=this.value">${esc(p.notes)}</textarea>
-      </div>`;
-    }
-
-    const roleImg = renderRoleImage(ch?.id, ch?.type, 32, "margin-right:8px;flex-shrink:0");
-    html += `<div class="player-row" style="border-color:${p.alive ? clr.bdr+'44' : '#222'};background:${p.alive ? clr.bg : 'rgba(20,20,20,0.5)'};opacity:${p.alive?1:0.55}">
-      <div class="player-main" onclick="state.expandedPlayer=${isExp?-1:i};render()">
-        <span class="seat-num" style="background:${p.alive?clr.bdr:'#444'}">${i+1}</span>
-        ${roleImg}
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:14px;color:${p.alive?'var(--text)':'#666'};${p.alive?'':'text-decoration:line-through'}">
-            ${esc(p.name)}${!p.alive&&p.ghostVote&&!p.ghostUsed?' 👻':''}${p.ghostUsed?' 💀':''}
-          </div>
-          <div style="font-size:11px;color:${clr.txt};margin-top:1px">
-            ${isDrunk?`🍺 DRUNK (thinks: ${c[p.believed]?.name||p.believed})`:(ch?.name||p.actual)}
-            <span style="color:var(--text3);margin-left:6px">${TEMOJI[ch?.type||"townsfolk"]} ${ch?.type||""}</span>
-          </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${state.rolePool.map(rid => {
+            const rc = chars[rid] || { name: rid, type: "townsfolk" };
+            return `
+              <span style="font-size:11px;background:${TYPE_CLR[rc.type].bg};border:1px solid ${TYPE_CLR[rc.type].bdr}33;color:${TYPE_CLR[rc.type].txt};padding:3px 6px;border-radius:4px">
+                ${rc.name}
+              </span>
+            `;
+          }).join("")}
         </div>
-        <div style="display:flex;gap:4px;flex-shrink:0">${badges}</div>
-        <span style="color:var(--text3);font-size:14px">${isExp?"▲":"▼"}</span>
       </div>
-      ${expanded}
-    </div>`;
-  });
 
-  // Travellers section
-  if (state.travellersEnabled && state.travellers.length > 0) {
-    html += `<div style="margin-top:16px;padding-top:16px;border-top:2px solid rgba(255,255,255,0.1)">
-      <div style="font-weight:600;font-size:13px;color:var(--text2);margin-bottom:8px">🧳 Travellers</div>`;
-    
-    state.travellers.forEach((t, i) => {
-      const travChar = s.TRAVELLERS?.[t.character];
-      const isExp = state.expandedTraveller === i;
-      const alignmentColor = t.alignment === "good" ? "#5dade2" : "#e74c3c";
-      
-      let expanded = "";
-      if (isExp) {
-        let actions = "";
-        if (t.alive && !t.exiled) {
-          if (isDay && gs.exiledToday === null) {
-            actions += `<button class="btn-sm" style="background:rgba(243,156,18,0.12);color:var(--orange)" onclick="exileTraveller(${i})">🚫 Exile</button> `;
-          }
-        } else if (t.exiled) {
-          actions += `<button class="btn-sm" style="background:rgba(39,174,96,0.12);color:var(--green)" onclick="unexileTraveller(${i})">✨ Return</button> `;
-        }
-        
-        const travExpandedImg = renderRoleImage(t.character, "traveller", 48, "margin-bottom:8px");
-        expanded = `<div class="player-expand">
-          ${travExpandedImg ? `<div style="text-align:center;margin-bottom:8px">${travExpandedImg}</div>` : ""}
-          <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;line-height:1.4">
-            <strong style="color:${alignmentColor}">Alignment:</strong> ${t.alignment === "good" ? "Good" : "Evil"}<br>
-            ${travChar ? `<strong>Ability:</strong> ${esc(travChar.ab)}` : ""}
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-            ${actions}
-            <button class="btn-sm" style="background:rgba(231,76,60,0.12);color:var(--red)" onclick="removeTraveller(${i})">✕ Remove</button>
-          </div>
-          <textarea class="input" style="font-size:11px;min-height:36px;resize:vertical" placeholder="Notes..."
-            oninput="state.travellers[${i}].notes=this.value">${esc(t.notes ?? "")}</textarea>
-        </div>`;
-      }
-      
-      const travImg = renderRoleImage(t.character, "traveller", 32, "margin-right:8px;flex-shrink:0");
-      html += `<div class="player-row" style="border-color:${t.exiled ? '#222' : 'rgba(243,156,18,0.4)'};background:${t.exiled ? 'rgba(20,20,20,0.5)' : 'rgba(243,156,18,0.08)'};opacity:${t.exiled?0.55:1}">
-        <div class="player-main" onclick="state.expandedTraveller=${isExp?-1:i};render()">
-          <span class="seat-num" style="background:${t.exiled ? '#444' : '#f39c12'}">T${i+1}</span>
-          ${travImg}
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:14px;color:${t.exiled?'#666':'var(--text)'};${t.exiled?'text-decoration:line-through':''}">
-              ${esc(t.name)} ${t.exiled ? '🚫' : ''}
-            </div>
-            <div style="font-size:11px;color:#f39c12;margin-top:1px">
-              ${travChar?.name || t.character || "Unknown"}
-              <span style="color:${alignmentColor};margin-left:6px">(${t.alignment === "good" ? "Good" : "Evil"})</span>
-            </div>
-          </div>
-        <span style="color:var(--text3);font-size:14px">${isExp?"▲":"▼"}</span>
+      <!-- Player List -->
+      <div style="margin-bottom:24px">
+        ${playerRows}
       </div>
-      ${expanded}
-    </div>`;
-  });
-    
-    html += `</div>`;
+
+      <button class="btn btn-primary" ${assignedCount < state.playerCount ? 'class="btn btn-disabled" disabled' : ''} onclick="finalizeGrimoire()">
+        📖 Finalize Grimoire
+      </button>
+      <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='names';render()">← Back to Roster</button>
+    </div>
+  `;
+}
+
+function randomizeAssignments() {
+  const shuffledPool = shuffle(state.rolePool);
+  for (let i = 0; i < state.playerCount; i++) {
+    state.assignments[i] = shuffledPool[i] || "";
   }
-  
-  // Add Traveller button
-  if (state.travellersEnabled) {
-    html += `<div style="margin-top:12px">
-      <button class="btn-outline" style="width:100%;color:#f39c12;border-color:rgba(243,156,18,0.3)" onclick="showAddTraveller()">+ Add Traveller</button>
-    </div>`;
-  } else {
-    html += `<div style="margin-top:12px">
-      <button class="btn-outline" style="width:100%;color:#f39c12;border-color:rgba(243,156,18,0.3)" onclick="enableTravellers()">🧳 Enable Travellers</button>
-    </div>`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// PLAYER ACTIONS
-// ══════════════════════════════════════════════════════════════════════════
-// Tea Lady protection check
-function isTeaLadyProtected(targetIdx) {
-  const gs = state.gs; const c = S().C;
-  const tl = gs.players.find(p => p.actual === "tealady" && p.alive && !p.poisoned && !p.drunkSource);
-  if (!tl) return false;
-  const tlIdx = gs.players.indexOf(tl);
-  const n = gs.players.length;
-  // Find alive neighbors of Tea Lady
-  let cw = -1, ccw = -1;
-  for (let d = 1; d < n; d++) { const i = (tlIdx+d)%n; if (gs.players[i].alive) { cw = i; break; } }
-  for (let d = 1; d < n; d++) { const i = (tlIdx-d+n)%n; if (gs.players[i].alive) { ccw = i; break; } }
-  // Both alive neighbors must be good
-  if (cw < 0 || ccw < 0) return false;
-  const cwGood = c[gs.players[cw].actual]?.team === "good";
-  const ccwGood = c[gs.players[ccw].actual]?.team === "good";
-  if (!cwGood || !ccwGood) return false;
-  // Target must be one of those neighbors
-  return targetIdx === cw || targetIdx === ccw;
-}
-
-function markNoDeath() {
-  pushUndo();
-  state.gs.nightKillDone = true;
-  state.gs.log.push(`Night ${state.gs.dayNum}: No death (kill blocked).`);
-  autoSave(); render();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// NIGHT WALKER ACTION FUNCTIONS
-// ══════════════════════════════════════════════════════════════════════════
-
-// TB: Poisoner picks target
-function nightAction_poison(i) {
-  pushUndo();
-  const gs = state.gs;
-  // Clear previous Poisoner poison (keep Pukka poison separate)
-  gs.players.forEach(p => { if (p.poisonSource === "poisoner") { p.poisoned = false; p.poisonSource = null; }});
-  gs.players[i].poisoned = true;
-  gs.players[i].poisonSource = "poisoner";
-  gs.log.push(`Night ${gs.dayNum}: Poisoner chose ${gs.players[i].name}.`);
-  autoSave(); render();
-}
-
-// TB: Monk protects target
-function nightAction_monkProtect(i) {
-  pushUndo();
-  const gs = state.gs;
-  gs.players[i].protected = true;
-  gs.log.push(`Night ${gs.dayNum}: Monk protects ${gs.players[i].name}.`);
-  autoSave(); render();
-}
-
-// TB: Butler chooses master
-function nightAction_butlerMaster(i) {
-  pushUndo();
-  const gs = state.gs;
-  // Clear old master
-  gs.players.forEach(p => p.master = false);
-  gs.players[i].master = true;
-  gs.log.push(`Night ${gs.dayNum}: Butler chose ${gs.players[i].name} as master.`);
-  autoSave(); render();
-}
-
-// TB: Ravenkeeper picks player to learn
-function nightAction_ravenkeeperPick(i) {
-  const gs = state.gs; const c = S().C;
-  const p = gs.players[i];
-  showCharCard(p.actual);
-  gs.log.push(`Night ${gs.dayNum}: Ravenkeeper chose ${p.name} — shown ${c[p.actual]?.name}.`);
-  autoSave();
-}
-
-// BMR: Sailor picks who to make drunk
-function nightAction_sailorDrunk(i) {
-  pushUndo();
-  const gs = state.gs;
-  // Clear previous Sailor drunk
-  gs.players.forEach(p => { if (p.drunkSource === "Sailor") p.drunkSource = null; });
-  gs.players[i].drunkSource = "Sailor";
-  gs.log.push(`Night ${gs.dayNum}: Sailor chose ${gs.players[i].name} — drunk until dusk.`);
-  autoSave(); render();
-}
-
-// BMR: Courtier picks character to make drunk (once per game)
-function nightAction_courtierPick(charId) {
-  pushUndo();
-  const gs = state.gs;
-  // Find alive player with that character
-  const target = gs.players.find(p => p.actual === charId && p.alive);
-  if (target) {
-    target.drunkSource = "Courtier";
-    gs.courtierTarget = charId;
-    gs.courtierTimer = 3;
-    gs.courtierUsed = true;
-    gs.log.push(`Night ${gs.dayNum}: Courtier chose ${S().C[charId]?.name} — ${target.name} drunk for 3 nights.`);
-  } else {
-    gs.courtierUsed = true;
-    gs.courtierTarget = charId;
-    gs.courtierTimer = 3;
-    gs.log.push(`Night ${gs.dayNum}: Courtier chose ${S().C[charId]?.name} (not in play — wasted).`);
-  }
-  autoSave(); render();
-}
-
-// BMR: Devil's Advocate protects from execution
-function nightAction_daProtect(i) {
-  pushUndo();
-  const gs = state.gs;
-  gs.players[i].daProtected = true;
-  gs.daTarget = i;
-  gs.log.push(`Night ${gs.dayNum}: Devil's Advocate protects ${gs.players[i].name} from execution.`);
-  autoSave(); render();
-}
-
-// BMR: Exorcist picks player (blocks demon)
-function nightAction_exorcistPick(i) {
-  pushUndo();
-  const gs = state.gs;
-  gs.exorcistTarget = i;
-  gs.log.push(`Night ${gs.dayNum}: Exorcist chose ${gs.players[i].name}.`);
-  autoSave(); render();
-}
-
-// BMR: Innkeeper picks 2 to protect, then 1 of them to drunk
-function nightAction_innkeeperPick(i) {
-  const gs = state.gs;
-  const picks = state.nightStepData.innkeeperPicks || [];
-  if (picks.length < 2) {
-    // Picking protected players
-    if (!picks.includes(i)) {
-      picks.push(i);
-      state.nightStepData.innkeeperPicks = picks;
-      if (picks.length === 2) {
-        // Both picked — now need to choose which is drunk
-        state.nightStepData.innkeeperPhase = "drunk";
-      }
-      render();
-    }
-  }
-}
-function nightAction_innkeeperDrunk(i) {
-  pushUndo();
-  const gs = state.gs;
-  const picks = state.nightStepData.innkeeperPicks || [];
-  picks.forEach(idx => { gs.players[idx].protected = true; });
-  gs.players[i].drunkSource = "Innkeeper";
-  gs.log.push(`Night ${gs.dayNum}: Innkeeper protects ${picks.map(idx=>gs.players[idx].name).join(" & ")}. ${gs.players[i].name} is drunk.`);
-  state.nightStepData.innkeeperPicks = null;
-  state.nightStepData.innkeeperPhase = null;
-  autoSave(); render();
-}
-function nightAction_innkeeperReset() {
-  state.nightStepData.innkeeperPicks = [];
-  state.nightStepData.innkeeperPhase = null;
-  render();
-}
-
-// BMR: Pukka — kill previous victim + poison new target
-function nightAction_pukkaKillPrev() {
-  pushUndo();
-  const gs = state.gs;
-  if (gs.pukkaVictimIdx >= 0) {
-    const prev = gs.players[gs.pukkaVictimIdx];
-    if (prev.alive) {
-      // Clear old Pukka poison
-      prev.poisoned = false;
-      prev.poisonSource = null;
-      prev.alive = false;
-      prev.ghostVote = true;
-      gs.diedTonight.push(gs.pukkaVictimIdx);
-      gs.nightKillDone = true;
-      gs.log.push(`Night ${gs.dayNum}: ${prev.name} dies (Pukka poison from last night).`);
-      checkWin();
-    }
-  }
-  gs.pukkaVictimIdx = -1;
-  autoSave(); render();
-}
-function nightAction_pukkaPoison(i) {
-  pushUndo();
-  const gs = state.gs;
-  gs.players[i].poisoned = true;
-  gs.players[i].poisonSource = "pukka";
-  gs.pukkaVictimIdx = i;
-  gs.log.push(`Night ${gs.dayNum}: Pukka poisons ${gs.players[i].name} (will die tomorrow night).`);
-  autoSave(); render();
-}
-function nightAction_pukkaSkipPrev() {
-  pushUndo();
-  const gs = state.gs;
-  if (gs.pukkaVictimIdx >= 0) {
-    const prev = gs.players[gs.pukkaVictimIdx];
-    prev.poisoned = false;
-    prev.poisonSource = null;
-  }
-  gs.pukkaVictimIdx = -1;
-  gs.log.push(`Night ${gs.dayNum}: Pukka previous victim survives (protected/blocked).`);
-  autoSave(); render();
-}
-
-// BMR: Po — charge or attack
-function nightAction_poCharge() {
-  pushUndo();
-  const gs = state.gs;
-  gs.poCharged = true;
-  gs.nightKillDone = true;
-  gs.log.push(`Night ${gs.dayNum}: Po charges up! (3 kills next night)`);
-  autoSave(); render();
-}
-function nightAction_poKill(i) {
-  const gs = state.gs;
-  const picks = state.nightStepData.poKills || [];
-  if (!picks.includes(i)) {
-    picks.push(i);
-    state.nightStepData.poKills = picks;
-    const needed = gs.poCharged ? 3 : 1;
-    if (picks.length >= needed) {
-      nightAction_poApply();
-    } else {
-      render();
-    }
-  }
-}
-function nightAction_poApply() {
-  pushUndo();
-  const gs = state.gs;
-  const picks = state.nightStepData.poKills || [];
-  picks.forEach(idx => {
-    const p = gs.players[idx];
-    if (p.alive) {
-      p.alive = false; p.ghostVote = true;
-      gs.diedTonight.push(idx);
-      gs.log.push(`Night ${gs.dayNum}: Po kills ${p.name}.`);
-    }
-  });
-  gs.nightKillDone = true;
-  gs.poCharged = false;
-  state.nightStepData.poKills = null;
-  autoSave(); render();
-  checkWin();
-}
-function nightAction_poReset() {
-  state.nightStepData.poKills = [];
-  render();
-}
-
-// BMR: Shabaloth kills 2 + optional regurgitate
-function nightAction_shabalothKill(i) {
-  const gs = state.gs;
-  const picks = state.nightStepData.shabKills || [];
-  if (!picks.includes(i)) {
-    picks.push(i);
-    state.nightStepData.shabKills = picks;
-    if (picks.length >= 2) {
-      nightAction_shabalothApply();
-    } else {
-      render();
-    }
-  }
-}
-function nightAction_shabalothApply() {
-  pushUndo();
-  const gs = state.gs;
-  const picks = state.nightStepData.shabKills || [];
-  picks.forEach(idx => {
-    const p = gs.players[idx];
-    if (p.alive) {
-      p.alive = false; p.ghostVote = true;
-      gs.diedTonight.push(idx);
-      gs.log.push(`Night ${gs.dayNum}: Shabaloth kills ${p.name}.`);
-    }
-  });
-  gs.nightKillDone = true;
-  state.nightStepData.shabKills = null;
-  autoSave(); render();
-  checkWin();
-}
-function nightAction_shabalothRegurgitate(i) {
-  pushUndo();
-  const gs = state.gs;
-  gs.players[i].alive = true;
-  gs.players[i].ghostVote = false;
-  gs.log.push(`Night ${gs.dayNum}: Shabaloth regurgitates ${gs.players[i].name}!`);
-  autoSave(); render();
-}
-function nightAction_shabalothReset() {
-  state.nightStepData.shabKills = [];
-  render();
-}
-
-// BMR: Assassin kill (once per game, bypasses ALL protection)
-function nightAction_assassinKill(i) {
-  pushUndo();
-  const gs = state.gs;
-  const p = gs.players[i];
-  p.alive = false; p.ghostVote = true;
-  gs.diedTonight.push(i);
-  gs.nightKillDone = true;
-  gs.assassinUsed = true;
-  gs.log.push(`Night ${gs.dayNum}: Assassin kills ${p.name} (bypasses ALL protection)!`);
-  autoSave(); render();
-  checkWin();
-}
-function nightAction_assassinSkip() {
-  pushUndo();
-  state.gs.log.push(`Night ${state.gs.dayNum}: Assassin chooses not to use ability.`);
-  autoSave(); render();
-}
-
-// BMR: Professor revives (once per game)
-function nightAction_professorRevive(i) {
-  pushUndo();
-  const gs = state.gs;
-  gs.players[i].alive = true;
-  gs.players[i].ghostVote = false;
-  gs.players[i].ghostUsed = false;
-  gs.professorUsed = true;
-  gs.log.push(`Night ${gs.dayNum}: Professor revives ${gs.players[i].name}!`);
-  autoSave(); render();
-}
-function nightAction_professorFail() {
-  pushUndo();
-  const gs = state.gs;
-  gs.professorUsed = true;
-  gs.log.push(`Night ${gs.dayNum}: Professor revive fails (wrong guess or poisoned).`);
-  autoSave(); render();
-}
-
-// BMR: Gambler guess resolution
-function nightAction_gamblerDies(i) {
-  pushUndo();
-  const gs = state.gs;
-  const p = gs.players[i];
-  p.alive = false; p.ghostVote = true;
-  gs.diedTonight.push(i);
-  gs.nightKillDone = true;
-  gs.log.push(`Night ${gs.dayNum}: Gambler (${p.name}) guessed WRONG — dies!`);
-  autoSave(); render();
-  checkWin();
-}
-
-// BMR: Moonchild kill (if died tonight and chose a good player)
-function nightAction_moonchildKill(i) {
-  pushUndo();
-  const gs = state.gs;
-  const p = gs.players[i];
-  p.alive = false; p.ghostVote = true;
-  gs.diedTonight.push(i);
-  gs.log.push(`Night ${gs.dayNum}: Moonchild revenge kills ${p.name}!`);
-  autoSave(); render();
-  checkWin();
-}
-
-function killPlayer(i) {
-  pushUndo();
-  const gs = state.gs;
-  const p = gs.players[i];
-  const s = S(); const c = s.C;
-
-  // TB: Imp self-kill → starpass
-  if (state.scriptId === "tb" && p.actual === "imp") {
-    p.alive = false; p.ghostVote = true;
-    gs.diedTonight.push(i);
-    gs.nightKillDone = true;
-    gs.log.push(`Night ${gs.dayNum}: ${p.name} (Imp) self-killed — STARPASS!`);
-    state.impStarpassPicker = true;
-    state.impDyingIndex = i;
-    autoSave(); render();
-    return;
-  }
-
-  // BMR: Protection checks
-  if (state.scriptId === "bmr") {
-    // Tea Lady: if both alive neighbors are good, they can't die
-    if (isTeaLadyProtected(i)) {
-      gs.nightKillDone = true;
-      gs.log.push(`Night ${gs.dayNum}: ${p.name} protected by Tea Lady (both neighbors good).`);
-      autoSave(); render();
-      return;
-    }
-    // Fool: first death doesn't count
-    if (p.actual === "fool" && !p.foolLifeUsed) {
-      p.foolLifeUsed = true;
-      gs.nightKillDone = true;
-      gs.log.push(`Night ${gs.dayNum}: ${p.name} (Fool) — first death blocked!`);
-      autoSave(); render();
-      return;
-    }
-    // Sailor: can't die (unless drunk)
-    if (p.actual === "sailor" && !p.drunkSource && !p.poisoned) {
-      gs.nightKillDone = true;
-      gs.log.push(`Night ${gs.dayNum}: ${p.name} (Sailor) — can't die.`);
-      autoSave(); render();
-      return;
-    }
-  }
-
-  p.alive = false; p.ghostVote = true;
-  gs.diedTonight.push(i);
-  gs.nightKillDone = true;
-  gs.log.push(`Night ${gs.dayNum}: ${p.name} killed (${c[p.actual]?.name})`);
-  autoSave(); render();
-  checkWin();
-}
-
-function executePlayer(i) {
-  pushUndo();
-  const gs = state.gs;
-  const p = gs.players[i];
-  const s = S(); const c = s.C;
-
-  // BMR: DA protection
-  if (state.scriptId === "bmr" && p.daProtected) {
-    gs.executedToday = i; // still counts as the execution
-    gs.log.push(`Day ${gs.dayNum}: ${p.name} executed but SURVIVES (Devil's Advocate).`);
-    autoSave(); render();
-    return;
-  }
-
-  // TB: Saint → evil wins
-  if (p.actual === "saint") {
-    p.alive = false; p.ghostVote = true;
-    gs.executedToday = i;
-    gs.log.push(`Day ${gs.dayNum}: ${p.name} executed — SAINT!`);
-    state.winMsg = {team:"evil", reason:"The Saint was executed! Evil wins."};
-    autoSave(); render();
-    return;
-  }
-
-  // BMR: Fool first life
-  if (state.scriptId === "bmr" && p.actual === "fool" && !p.foolLifeUsed) {
-    p.foolLifeUsed = true;
-    gs.executedToday = i;
-    gs.log.push(`Day ${gs.dayNum}: ${p.name} (Fool) executed — first death blocked!`);
-    autoSave(); render();
-    return;
-  }
-
-  p.alive = false; p.ghostVote = true;
-  gs.executedToday = i;
-  gs.log.push(`Day ${gs.dayNum}: ${p.name} executed (${c[p.actual]?.name})`);
-
-  // Demon executed
-  if (c[p.actual]?.type === "demon") {
-    const aliveCount = gs.players.filter(pp => pp.alive).length;
-
-    // TB: Scarlet Woman check
-    if (state.scriptId === "tb") {
-      const sw = gs.players.find(pp => pp.actual === "scarletwoman" && pp.alive);
-      if (sw && aliveCount >= 5) {
-        const swIdx = gs.players.indexOf(sw);
-        gs.players[swIdx].actual = "imp";
-        gs.players[swIdx].believed = "imp";
-        gs.log.push(`→ ${sw.name} (Scarlet Woman) becomes the Imp! (${aliveCount} alive ≥ 5)`);
-        autoSave(); render();
-        return;
-      }
-    }
-
-    // BMR: Mastermind check
-    if (state.scriptId === "bmr") {
-      const mm = gs.players.find(pp => pp.actual === "mastermind" && pp.alive);
-      if (mm) {
-        gs.mastermindDay = true;
-        gs.log.push(`→ Mastermind (${mm.name}) is alive! Play continues — next execution, that player's team loses.`);
-        autoSave(); render();
-        return;
-      }
-    }
-
-    state.winMsg = {team:"good", reason:`The Demon (${p.name}) has been executed!`};
-    autoSave(); render();
-    return;
-  }
-
-  // BMR: Minion executed → Minstrel trigger
-  if (state.scriptId === "bmr" && c[p.actual]?.type === "minion") {
-    const minstrel = gs.players.find(pp => pp.actual === "minstrel" && pp.alive);
-    if (minstrel) {
-      gs.minstrelAllDrunk = true;
-      gs.log.push(`→ Minion executed! Minstrel (${minstrel.name}): everyone is drunk until dusk tomorrow.`);
-    }
-  }
-
-  // BMR: Zombuul first death
-  if (state.scriptId === "bmr" && p.actual === "zombuul" && !p.zombuulUndead) {
-    p.zombuulUndead = true;
-    gs.log.push(`→ ${p.name} (Zombuul) appears dead but is actually still alive (undead)!`);
-    // Note: alive=false but zombuulUndead=true means demon still "in play"
-  }
-
-  // Mastermind day: whoever was executed, their team loses
-  if (state.scriptId === "bmr" && gs.mastermindDay) {
-    const team = c[p.actual]?.team;
-    if (team === "good") {
-      state.winMsg = {team:"evil", reason:`Mastermind's day: ${p.name} (good) was executed — evil wins!`};
-    } else {
-      state.winMsg = {team:"good", reason:`Mastermind's day: ${p.name} (evil) was executed — good wins!`};
-    }
-  }
-
-  autoSave(); render();
-  checkWin();
-}
-
-function togglePoison(i) { state.gs.players[i].poisoned = !state.gs.players[i].poisoned; autoSave(); render(); }
-function toggleProtect(i) { state.gs.players[i].protected = !state.gs.players[i].protected; autoSave(); render(); }
-
-// ══════════════════════════════════════════════════════════════════════════
-// TRAVELLER MANAGEMENT
-// ══════════════════════════════════════════════════════════════════════════
-function enableTravellers() {
-  state.travellersEnabled = true;
-  state.travellers = state.travellers || [];
   autoSave();
   render();
 }
 
-function showAddTraveller() {
+// Edit a single player's role assignment manually
+function editPlayerRole(playerIdx) {
   const s = S();
-  const travellers = s.TRAVELLERS || {};
-  const travellerList = Object.values(travellers);
+  const chars = s.C;
   
-  if (travellerList.length === 0) {
-    alert("No Travellers available for this script.");
-    return;
-  }
-  
-  const name = prompt("Enter Traveller name:");
-  if (!name || !name.trim()) return;
-  
-  let charList = travellerList.map((t, i) => `${i+1}. ${t.name}`).join("\n");
-  const charId = prompt(`Select Traveller character:\n${charList}\n\nEnter number (1-${travellerList.length}):`);
-  if (!charId) return;
-  
-  const charIdx = parseInt(charId) - 1;
-  if (charIdx < 0 || charIdx >= travellerList.length) {
-    alert("Invalid selection.");
-    return;
-  }
-  
-  const selectedChar = travellerList[charIdx];
-  const alignment = confirm("Is this Traveller Good? (OK = Good, Cancel = Evil)") ? "good" : "evil";
-  
-  const maxSeat = Math.max(...(state.travellers || []).map(t => t.seat || 0), state.gs?.players?.length || 0);
-  const newTraveller = {
-    name: name.trim(),
-    character: selectedChar.id,
-    alignment: alignment,
-    seat: maxSeat + 1,
-    alive: true,
-    exiled: false,
-    notes: "",
-  };
-  
-  state.travellers = [...(state.travellers || []), newTraveller];
-  autoSave();
-  render();
-}
+  // Render options from pool + unpicked script roles
+  let optionsHtml = "";
+  Object.keys(chars).forEach(rid => {
+    const c = chars[rid];
+    const inPool = state.rolePool.includes(rid);
+    const badge = inPool ? `<span style="font-size:9px;background:rgba(255,255,255,0.05);color:var(--text3);padding:2px 4px;border-radius:3px">Pool</span>` : "";
 
-function removeTraveller(i) {
-  if (confirm(`Remove Traveller "${state.travellers[i].name}"?`)) {
-    state.travellers.splice(i, 1);
-    if (state.expandedTraveller === i) state.expandedTraveller = -1;
-    else if (state.expandedTraveller > i) state.expandedTraveller--;
-    autoSave();
-    render();
-  }
-}
-
-function exileTraveller(i) {
-  pushUndo();
-  const t = state.travellers[i];
-  const gs = state.gs;
-  
-  t.exiled = true;
-  t.alive = false;
-  gs.exiledToday = i;
-  gs.log.push(`Day ${gs.dayNum}: ${t.name} (${t.character}) exiled.`);
-  
-  autoSave();
-  render();
-}
-
-function unexileTraveller(i) {
-  pushUndo();
-  const t = state.travellers[i];
-  const gs = state.gs;
-  
-  t.exiled = false;
-  t.alive = true;
-  if (gs.exiledToday === i) gs.exiledToday = null;
-  gs.log.push(`Day ${gs.dayNum}: ${t.name} returns from exile.`);
-  
-  autoSave();
-  render();
-}
-function revivePlayer(i) {
-  pushUndo();
-  const gs = state.gs;
-  gs.players[i].alive = true;
-  gs.players[i].ghostVote = false;
-  gs.players[i].ghostUsed = false;
-  if (gs.executedToday === i) gs.executedToday = null;
-  if (gs.diedTonight.includes(i)) {
-    gs.diedTonight = gs.diedTonight.filter(x => x !== i);
-    gs.nightKillDone = false;
-  }
-  autoSave(); render();
-}
-function useGhostVote(i) {
-  state.gs.players[i].ghostUsed = true;
-  state.gs.log.push(`${state.gs.players[i].name} used their ghost vote.`);
-  autoSave(); render();
-}
-
-// TB: Imp starpass
-function doImpStarpass(minionIdx) {
-  const gs = state.gs;
-  const minion = gs.players[minionIdx];
-  gs.log.push(`→ ${minion.name} (${S().C[minion.actual]?.name}) is now the Imp!`);
-  gs.players[minionIdx].actual = "imp";
-  gs.players[minionIdx].believed = "imp";
-  state.impStarpassPicker = false;
-  state.impDyingIndex = -1;
-  autoSave(); render();
-}
-
-// Win check
-function checkWin() {
-  const gs = state.gs;
-  const s = S(); const c = s.C;
-  const alive = gs.players.filter(p => p.alive);
-
-  // Zombuul undead counts as "alive" for win condition
-  let demonAlive;
-  if (state.scriptId === "bmr") {
-    demonAlive = gs.players.find(p => (p.alive || p.zombuulUndead) && c[p.actual]?.type === "demon");
-  } else {
-    demonAlive = alive.find(p => c[p.actual]?.type === "demon");
-  }
-
-  if (alive.length <= 2 && demonAlive) {
-    state.winMsg = {team:"evil", reason:`Only ${alive.length} players remain. The Demon survives!`};
-    render();
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// IMP STARPASS OVERLAY (added to renderOverlays)
-// ══════════════════════════════════════════════════════════════════════════
-const _origOverlays = renderOverlays;
-renderOverlays = function() {
-  let html = _origOverlays();
-
-  // Imp starpass picker
-  if (state.impStarpassPicker && state.gs) {
-    const c = S().C;
-    const aliveMinions = state.gs.players.map((p,i)=>({...p,i})).filter(p=>p.alive && c[p.actual]?.type==="minion");
-    let btns = "";
-    aliveMinions.forEach(m => {
-      btns += `<button class="btn" style="margin-bottom:8px;padding:10px;background:${TYPE_CLR.minion.bg};border:1px solid ${TYPE_CLR.minion.bdr};color:${TYPE_CLR.minion.txt};font-size:14px" onclick="doImpStarpass(${m.i})">${esc(m.name)} (${c[m.actual]?.name})</button>`;
-    });
-    if (aliveMinions.length === 0) {
-      btns = `<div style="color:var(--text3);padding:12px">No alive Minions — no starpass.</div>
-        <button class="btn btn-primary" style="padding:10px;font-size:13px" onclick="state.impStarpassPicker=false;render()">OK</button>`;
-    }
-    html += `<div class="overlay" style="z-index:230">
-      <div class="overlay-box" style="border:2px solid var(--red)">
-        <div style="font-size:36px;margin-bottom:8px">👹</div>
-        <div style="font-size:16px;font-weight:700;color:var(--red);margin-bottom:4px">Imp Starpass!</div>
-        <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Imp killed themselves. Choose which Minion becomes Imp.</div>
-        ${btns}
-      </div>
-    </div>`;
-  }
-
-  return html;
-};
-
-// ══════════════════════════════════════════════════════════════════════════
-// DAY PHASE TAB
-// ══════════════════════════════════════════════════════════════════════════
-function renderDayPhase() {
-  const gs = state.gs;
-  const alive = gs.players.filter(p => p.alive).length;
-  const majority = Math.ceil(alive / 2);
-
-  let html = `<div style="padding:16px">
-    <h3 style="font-size:22px;color:var(--orange);margin-bottom:16px;font-family:var(--font-serif)">☀️ Day ${gs.dayNum}</h3>
-    <div class="card" style="font-size:13px;margin-bottom:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.05)">
-      <div style="font-size:14px;color:var(--text)">👤 <strong>${alive}</strong> alive — need <strong style="color:var(--orange)">${majority}</strong> votes to execute</div>
-      ${gs.executedToday !== null ? `<div style="margin-top:8px;color:var(--red);font-weight:600">⚖️ Executed today: ${gs.players[gs.executedToday]?.name}</div>` : '<div style="margin-top:8px;color:var(--text3)">No execution yet</div>'}
-      ${gs.exiledToday !== null && state.travellers?.[gs.exiledToday] ? `<div style="margin-top:8px;color:#f39c12;font-weight:600">🚫 Exiled today: ${state.travellers[gs.exiledToday]?.name}</div>` : ''}
-    </div>`;
-
-  // BMR warnings
-  if (state.scriptId === "bmr") {
-    if (gs.mastermindDay) {
-      html += `<div class="warn warn-red" style="margin-bottom:12px;font-weight:600">🎭 MASTERMIND DAY: If any player is executed, their team loses!</div>`;
-    }
-    if (gs.minstrelAllDrunk) {
-      html += `<div class="warn warn-orange" style="margin-bottom:12px;font-weight:600">🎵 MINSTREL: Everyone is drunk until dusk!</div>`;
-    }
-  }
-
-  // Timer
-  html += renderTimer();
-
-  // Slayer ability (TB — once per game, day only)
-  if (state.scriptId === "tb") {
-    const slayer = gs.players.find(p => p.alive && (p.actual === "slayer" || (p.actual === "drunk" && p.believed === "slayer")));
-    if (slayer && !slayer.abilityUsed) {
-      html += `<div class="card" style="border-color:rgba(184,29,36,0.3);background:var(--surface2);margin-top:16px">
-        <div style="font-weight:600;font-size:13px;color:var(--red);margin-bottom:8px">⚔️ Slayer — ${esc(slayer.name)}</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Once per game: publicly choose a player. If they are the Demon, they die.</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">`;
-      gs.players.forEach((p, idx) => {
-        if (!p.alive || idx === gs.players.indexOf(slayer)) return;
-        html += `<button class="btn-sm" style="background:rgba(184,29,36,0.12);color:var(--text);border:1px solid var(--border)" onclick="slayerUse(${gs.players.indexOf(slayer)},${idx})">${esc(p.name)}</button>`;
-      });
-      html += `</div></div>`;
-    }
-  }
-
-  // Manual win declaration
-  html += `<div style="margin-top:20px;display:flex;gap:10px">
-    <button class="btn-outline" style="flex:1;color:var(--blue);border-color:rgba(41,128,185,0.3);font-size:12px;margin:0" onclick="declareWin('good')">😇 Good Wins</button>
-    <button class="btn-outline" style="flex:1;color:var(--red);border-color:rgba(184,29,36,0.3);font-size:12px;margin:0" onclick="declareWin('evil')">😈 Evil Wins</button>
-  </div>`;
-
-  // Gossip tracker (BMR)
-  if (state.scriptId === "bmr" && gs.players.some(p => p.alive && p.actual === "gossip")) {
-    html += `<div class="card" style="border-color:rgba(243,156,18,0.3);background:var(--surface2);margin-top:16px">
-      <div style="font-weight:600;font-size:13px;color:var(--orange);margin-bottom:8px;font-family:var(--font-serif)">💬 Gossip Tracker</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <input class="input" style="flex:1;font-size:12px;background:rgba(0,0,0,0.2)" id="gossipInput" placeholder="Gossip statement..."
-          onkeydown="if(event.key==='Enter')addGossip()">
-        <button class="btn-sm" style="background:rgba(243,156,18,0.15);color:var(--orange);font-weight:600" onclick="addGossip()">Add</button>
-      </div>`;
-    (gs.gossipStatements || []).forEach((g, idx) => {
-      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border)">
-        <span style="flex:1;color:${g.resolved?'var(--text3)':'var(--text)'};${g.resolved?'text-decoration:line-through':''}">${esc(g.text)}</span>
-        <span style="display:flex;gap:4px">
-          <button class="btn-sm" style="background:rgba(39,174,96,0.15);color:var(--green);font-size:10px;font-weight:700" onclick="resolveGossip(${idx},true)">T</button>
-          <button class="btn-sm" style="background:rgba(184,29,36,0.15);color:var(--red);font-size:10px;font-weight:700" onclick="resolveGossip(${idx},false)">F</button>
+    optionsHtml += `
+      <button class="btn" style="text-align:left;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);justify-content:space-between;margin-bottom:6px" 
+        onclick="assignRoleToPlayer(${playerIdx}, '${rid}');state.showCard=null;render()">
+        <span style="display:flex;align-items:center;gap:8px">
+          ${renderRoleImage(c.id, c.type, 20)}
+          <strong style="color:${TYPE_CLR[c.type].txt}">${c.name}</strong>
+          <span style="font-size:10px;color:var(--text3)">(${c.type})</span>
         </span>
-      </div>`;
-    });
-    html += `</div>`;
-  }
+        ${badge}
+      </button>
+    `;
+  });
 
-  html += `</div>`;
-  return html;
-}
-
-function addGossip() {
-  const el = document.getElementById("gossipInput");
-  if (!el || !el.value.trim()) return;
-  if (!state.gs.gossipStatements) state.gs.gossipStatements = [];
-  state.gs.gossipStatements.push({ text: el.value.trim(), resolved: false, isTrue: null });
-  autoSave(); render();
-}
-function resolveGossip(idx, isTrue) {
-  if (!state.gs.gossipStatements?.[idx]) return;
-  state.gs.gossipStatements[idx].resolved = true;
-  state.gs.gossipStatements[idx].isTrue = isTrue;
-  state.gs.log.push(`Gossip: "${state.gs.gossipStatements[idx].text}" — ${isTrue ? "TRUE (someone dies tonight!)" : "FALSE"}`);
-  autoSave(); render();
-}
-
-// Slayer ability
-function slayerUse(slayerIdx, targetIdx) {
-  pushUndo();
-  const gs = state.gs; const c = S().C;
-  const slayer = gs.players[slayerIdx];
-  const target = gs.players[targetIdx];
-  slayer.abilityUsed = true;
-  const isDemon = c[target.actual]?.type === "demon";
-  const isDrunkSlayer = slayer.actual === "drunk";
-  if (isDemon && !isDrunkSlayer && !slayer.poisoned) {
-    target.alive = false; target.ghostVote = true;
-    gs.log.push(`Day ${gs.dayNum}: ${slayer.name} (Slayer) shot ${target.name} — DEMON DIES!`);
-    state.winMsg = {team:"good", reason:`${slayer.name} slayed the Demon (${target.name})!`};
-  } else {
-    gs.log.push(`Day ${gs.dayNum}: ${slayer.name} (Slayer) shot ${target.name} — nothing happens.`);
-  }
-  autoSave(); render();
-}
-
-// Manual win declaration
-function declareWin(team) {
-  state.winMsg = {team, reason: `Storyteller declared ${team === "good" ? "Good" : "Evil"} wins.`};
+  state.showCard = {
+    title: `Assign Role: ${esc(state.names[playerIdx])}`,
+    emoji: "🃏",
+    text: `Select a character token to place in ${esc(state.names[playerIdx])}'s grimoire slot:<br><br><div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column">${optionsHtml}</div>`
+  };
   render();
 }
 
-// Mayor check: 3 alive + no execution + Mayor alive = good wins
-function checkMayorWin() {
-  if (state.scriptId !== "tb") return;
-  const gs = state.gs;
-  const alive = gs.players.filter(p => p.alive);
-  const mayor = alive.find(p => p.actual === "mayor");
-  if (mayor && alive.length === 3 && gs.executedToday === null) {
-    state.winMsg = {team:"good", reason:`Mayor (${mayor.name}) is alive with 3 players and no execution — Good wins!`};
+function assignRoleToPlayer(pIdx, rid) {
+  state.assignments[pIdx] = rid;
+  // If role chosen wasn't in pool, swap/append it dynamically
+  if (!state.rolePool.includes(rid)) {
+    const oldRole = state.assignments[pIdx];
+    const oldIdx = state.rolePool.indexOf(oldRole);
+    if (oldIdx >= 0) {
+      state.rolePool[oldIdx] = rid;
+    } else {
+      state.rolePool.push(rid);
+    }
+  }
+  autoSave();
+}
+
+// Customize dynamic pool
+function openPoolEditor() {
+  const s = S();
+  const chars = s.C;
+  
+  let listHtml = "";
+  Object.keys(chars).forEach(rid => {
+    const c = chars[rid];
+    const selected = state.rolePool.includes(rid);
+    
+    listHtml += `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px;border-bottom:1px solid var(--border)">
+        <span style="display:flex;align-items:center;gap:6px">
+          ${renderRoleImage(c.id, c.type, 18)}
+          <span style="color:${TYPE_CLR[c.type].txt};font-size:13px">${c.name}</span>
+        </span>
+        <input type="checkbox" ${selected ? 'checked' : ''} onchange="togglePoolRole('${rid}', this.checked)">
+      </div>
+    `;
+  });
+
+  state.showCard = {
+    title: "Customize Role Pool",
+    emoji: "⚙️",
+    text: `Toggle roles that should be present in tonight's distribution:<br><br><div style="max-height:250px;overflow-y:auto;text-align:left">${listHtml}</div>`
+  };
+  render();
+}
+
+function togglePoolRole(rid, enabled) {
+  if (enabled) {
+    if (!state.rolePool.includes(rid)) state.rolePool.push(rid);
+  } else {
+    state.rolePool = state.rolePool.filter(id => id !== rid);
+  }
+  autoSave();
+}
+
+// Finalize the setup stage and enter Hand-off reveal
+function finalizeGrimoire() {
+  // Complete initial states
+  state.dayNum = 1;
+  state.phase = "night";
+  state.activeWakeIdx = 0;
+  state.nightLog = [];
+  state.revealIndex = 0;
+  state.winTeam = null;
+
+  // Set initial alive status
+  state.alive = {};
+  state.votes = {};
+  state.ghostVotes = {};
+  for (let i = 0; i < state.playerCount; i++) {
+    state.alive[i] = true;
+    state.votes[i] = 1;
+    state.ghostVotes[i] = false;
+  }
+
+  // Push initial game start log into chronicle
+  state.chronicle = [
+    {
+      type: "system",
+      title: "Tragedy Begins",
+      details: `A new game of <strong>${S().name}</strong> has commenced at Ravenswood Bluff with ${state.playerCount} players.`,
+      badgeColor: "var(--border)"
+    }
+  ];
+
+  state.screen = "reveal";
+  autoSave();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FLOW 4: HAND-OFF ROLE REVEAL SCREEN (`Role Reveal.png`)
+// ══════════════════════════════════════════════════════════════════════════
+function renderRevealScreen() {
+  const pIdx = state.revealIndex;
+  const pName = state.names[pIdx];
+  const rId = state.assignments[pIdx];
+  const c = S().C[rId];
+
+  const colors = TYPE_CLR[c.type];
+  const alignLabel = c.team === "evil" ? "EVIL • DEMON / MINION" : "GOOD • TOWNSFOLK / OUTSIDER";
+  const alignColor = c.team === "evil" ? "var(--red)" : "var(--green)";
+
+  return `
+    <div class="screen fade-in" style="padding-top:16px">
+      <!-- Full screen hand-off layout -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red)"></span>
+          Phase: Hand-off
+        </span>
+        <button onclick="abortToGrimSetup()" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer">✕</button>
+      </div>
+
+      <div class="card" style="border: 2px solid ${colors.bdr};box-shadow: 0 0 20px ${colors.bdr}22;border-radius:16px;padding:32px 24px;text-align:center;margin-bottom:24px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">PLAYER ${pIdx + 1} OF ${state.playerCount}</div>
+        <h2 style="font-family:var(--font-serif);font-size:32px;color:var(--text);margin-bottom:18px">${esc(pName)}</h2>
+        
+        <div style="margin-bottom:18px">${renderRoleImage(c.id, c.type, 96)}</div>
+        
+        <div style="font-size:11px;font-weight:700;color:${alignColor};letter-spacing:2px;margin-bottom:6px">${alignLabel}</div>
+        <h1 style="font-family:var(--font-serif);font-size:40px;color:${colors.txt};margin-bottom:16px">${c.name}</h1>
+        
+        <div style="background:rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--text2);line-height:1.6;text-align:left">
+          ${esc(c.ab)}
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <button class="btn btn-outline" style="flex:1;margin:0" ${pIdx === 0 ? 'disabled' : ''} onclick="prevReveal()">← Prev</button>
+        <div class="phase-badge done" style="font-weight:700">${pIdx + 1} of ${state.playerCount}</div>
+        <button class="btn btn-primary" style="flex:2;margin:0" onclick="nextReveal()">
+          ${pIdx < state.playerCount - 1 ? 'Next Player →' : '🌙 Start Night 1'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function prevReveal() {
+  if (state.revealIndex > 0) {
+    state.revealIndex--;
     render();
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// TIMER
-// ══════════════════════════════════════════════════════════════════════════
-const TIMER_PHASES = ["Personal", "Public", "Nominations"];
-const TIMER_PHASE_COLORS = ["var(--blue)", "var(--orange)", "var(--red)"];
-
-function getTimerDefaults(count) {
-  if (count <= 8) return [180, 120, 30];
-  if (count <= 12) return [300, 180, 30];
-  return [420, 240, 45];
-}
-
-function initTimer() {
-  if (state.timer && state.timer.intervalId) {
-    clearInterval(state.timer.intervalId);
-  }
-  const durs = getTimerDefaults(state.gs?.players?.length || state.playerCount);
-  state.timer = {
-    phase: 0, running: false, paused: false,
-    seconds: durs[0], totalSeconds: durs[0],
-    alarm: false, intervalId: null,
-    durations: [...durs], showSettings: false,
-  };
-}
-
-function startTimer() {
-  if (state.timer.running) return;
-  state.timer.running = true; state.timer.paused = false; state.timer.alarm = false;
-  state.timer.intervalId = setInterval(timerTick, 1000);
-  render();
-}
-function pauseTimer() {
-  state.timer.paused = true; state.timer.running = false;
-  if (state.timer.intervalId) {
-    clearInterval(state.timer.intervalId);
-    state.timer.intervalId = null;
-  }
-  render();
-}
-function stopTimer() {
-  state.timer.running = false; state.timer.paused = false;
-  if (state.timer.intervalId) {
-    clearInterval(state.timer.intervalId);
-    state.timer.intervalId = null;
-  }
-}
-function timerTick() {
-  const t = state.timer;
-  if (!t || !t.running) return;
-  if (t.seconds > 0) {
-    t.seconds--;
-    if (t.seconds <= 10 && t.seconds > 0) {
-      try { navigator.vibrate?.(50); } catch(e){}
-    }
-    if (t.seconds === 0) {
-      t.alarm = true;
-      playAlarm();
-      try { navigator.vibrate?.([200,100,200,100,200]); } catch(e){}
-      render(); // Full render to show alarm controls
-      return;
-    }
-  }
-  // Targeted timer update instead of full render
-  updateTimerDisplay();
-}
-function updateTimerDisplay() {
-  const el = document.getElementById("timerDisplay");
-  const bar = document.getElementById("timerBar");
-  const wrap = document.getElementById("timerWrap");
-  if (!el || !state.timer) return;
-  const t = state.timer;
-  const low = t.seconds <= 10 && t.seconds > 0;
-  const done = t.seconds === 0;
-  const clr = TIMER_PHASE_COLORS[t.phase];
-  el.textContent = formatTime(t.seconds);
-  el.className = "timer-display" + (low?" timer-low":"") + (done?" timer-done":"");
-  el.style.color = done ? "var(--red)" : low ? "var(--orange)" : clr;
-  if (bar) {
-    const pct = t.totalSeconds > 0 ? (t.seconds / t.totalSeconds * 100) : 0;
-    bar.style.width = pct + "%";
-  }
-  if (wrap) {
-    wrap.className = "timer-wrap" + (t.alarm ? " timer-alarm" : "");
-  }
-}
-function timerAdvance() {
-  const t = state.timer;
-  if (t.phase < 2) {
-    t.phase++; t.alarm = false;
-    t.seconds = t.durations[t.phase];
-    t.totalSeconds = t.durations[t.phase];
-    if (!t.running) { t.running = true; t.intervalId = setInterval(timerTick, 1000); }
+function nextReveal() {
+  if (state.revealIndex < state.playerCount - 1) {
+    state.revealIndex++;
+    render();
   } else {
-    stopTimer(); t.alarm = false;
+    // Reveal finished, proceed to night 1
+    state.screen = "game";
+    state.tab = "night";
+    state.phase = "night";
+    state.dayNum = 1;
+    state.activeWakeIdx = 0;
+    state.nightLog = [];
+    autoSave();
+    render();
   }
+}
+
+function abortToGrimSetup() {
+  state.screen = "roles";
   render();
 }
-function timerReset() {
-  const t = state.timer;
-  t.seconds = t.durations[t.phase];
-  t.totalSeconds = t.durations[t.phase];
-  t.alarm = false;
-  render();
-}
-function timerSetPhase(p) {
-  stopTimer();
-  const t = state.timer;
-  t.phase = p; t.seconds = t.durations[p]; t.totalSeconds = t.durations[p];
-  t.alarm = false; t.running = false; t.paused = false;
-  render();
-}
-function timerAdjust(idx, delta) {
-  const t = state.timer;
-  t.durations[idx] = Math.max(idx===2?5:15, t.durations[idx] + delta);
-  if (idx === t.phase && !t.running) {
-    t.seconds = t.durations[idx]; t.totalSeconds = t.durations[idx];
+
+// ══════════════════════════════════════════════════════════════════════════
+// FLOW 5: GUIDED NIGHT PHASE SCREEN (`Night Phase.png`)
+// ══════════════════════════════════════════════════════════════════════════
+function renderNightScreen() {
+  const s = S();
+  const nightOrder = state.dayNum === 1 ? s.FIRST_NIGHT : s.OTHER_NIGHT;
+  
+  // Filter active wake order to only show elements in play
+  const activeWakeList = nightOrder.filter(n => {
+    // minion/demon info always wakes on Night 1
+    if (n.id.startsWith("_")) return true;
+    
+    // Check if role is in play
+    return Object.values(state.assignments).includes(n.id);
+  });
+
+  const stepCount = activeWakeList.length;
+
+  if (state.activeWakeIdx >= stepCount) {
+    // Night is complete, proceed to Day announcements
+    return `
+      <div style="padding:16px;text-align:center">
+        <div style="font-size:48px;margin-bottom:14px">🌅</div>
+        <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:8px">Night Sequence Complete</h3>
+        <p style="color:var(--text3);font-size:13px;line-height:1.6;margin-bottom:24px">
+          All active roles have been processed successfully. Prepare your morning announcements.
+        </p>
+        <button class="btn btn-primary" onclick="proceedToDay()">Rise & Shine for Day ${state.dayNum} →</button>
+      </div>
+    `;
   }
+
+  const activeNode = activeWakeList[state.activeWakeIdx];
+  const charDetails = s.C[activeNode.id] || { name: activeNode.title || activeNode.id, type: "demon", ab: "", fn_r: "", on_r: "" };
+
+  // Waking list timeline builder
+  let timelineItems = "";
+  activeWakeList.forEach((n, idx) => {
+    const rc = s.C[n.id] || { name: n.title || n.id, type: "demon" };
+    const done = idx < state.activeWakeIdx;
+    const current = idx === state.activeWakeIdx;
+
+    if (done) {
+      timelineItems += `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;opacity:0.4">
+          <span style="font-size:12px;color:var(--green)">✓</span>
+          <span style="font-size:13px;text-decoration:line-through">${rc.name}</span>
+        </div>
+      `;
+    } else if (current) {
+      timelineItems += `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;background:rgba(149, 27, 30, 0.12);border:1px solid rgba(149, 27, 30, 0.3);padding:6px 12px;border-radius:6px">
+          <span style="font-size:10px;color:var(--red)">▶</span>
+          <strong style="font-size:13px;color:var(--text)">${rc.name}</strong>
+        </div>
+      `;
+    } else {
+      timelineItems += `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;opacity:0.35">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>
+          <span style="font-size:13px">${rc.name}</span>
+        </div>
+      `;
+    }
+  });
+
+  // Action variables checklist
+  const wakeDesc = state.dayNum === 1 ? (charDetails.fn_r || "Give info") : (charDetails.on_r || "Perform action");
+  let actionControls = "";
+
+  if (!activeNode.id.startsWith("_")) {
+    // Display checkboxes or player options
+    let playerSelect = "";
+    for (let i = 0; i < state.playerCount; i++) {
+      if (state.alive[i]) {
+        playerSelect += `<option value="${i}">${esc(state.names[i])} (${s.C[state.assignments[i]]?.name})</option>`;
+      }
+    }
+
+    actionControls = `
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;text-align:left">
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">Log Action</label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <select id="night-target-select" class="input" style="flex:1">
+            <option value="">-- Choose player target --</option>
+            ${playerSelect}
+          </select>
+          <button class="btn btn-primary" style="width:auto" onclick="submitNightTarget('${activeNode.id}')">Submit</button>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div style="padding:16px">
+      <!-- Active Card -->
+      <div class="card" style="border-radius:12px;border-color:var(--border);padding:24px;margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-size:10px;font-weight:700;color:${TYPE_CLR[charDetails.type]?.txt || 'var(--text3)'};text-transform:uppercase;letter-spacing:1.5px">
+            ${(charDetails.type || 'SYSTEM').toUpperCase()} • ACTION REQUIRED
+          </span>
+          <span style="font-size:11px;color:var(--text3)">${state.activeWakeIdx + 1} of ${stepCount}</span>
+        </div>
+        
+        <h3 style="font-family:var(--font-serif);font-size:28px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:10px">
+          ${renderRoleImage(charDetails.id, charDetails.type, 32)}
+          ${charDetails.name}
+        </h3>
+
+        <div style="background:rgba(0,0,0,0.25);border:1px solid var(--border);padding:14px;border-radius:8px;font-size:13px;line-height:1.6;color:var(--text2);text-align:left">
+          <strong>Storyteller Instructions:</strong><br>
+          <span style="display:block;margin-top:4px;color:var(--orange)">${esc(wakeDesc)}</span>
+        </div>
+
+        ${actionControls}
+
+        <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:16px">
+          <button class="btn btn-primary" style="width:auto;padding:8px 16px" onclick="nextNightStep()">
+            Next Step →
+          </button>
+        </div>
+      </div>
+
+      <!-- Timeline Order -->
+      <div class="card" style="border-radius:12px;background:rgba(0,0,0,0.1);padding:16px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">NIGHT ORDER SEQUENCE</div>
+        <div style="max-height:160px;overflow-y:auto;text-align:left">
+          ${timelineItems}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function submitNightTarget(rid) {
+  const el = document.getElementById("night-target-select");
+  if (!el || el.value === "") return;
+  const pIdx = parseInt(el.value);
+  const pName = state.names[pIdx];
+
+  state.nightLog.push({ roleId: rid, targetIndex: pIdx });
+
+  // Custom logical actions based on scripts
+  if (rid === "poisoner") {
+    // Poison target
+    state.chronicle.push({
+      type: "night",
+      nightNum: state.dayNum,
+      title: "Poisoner Target",
+      details: `The Poisoner poisoned <strong>${pName}</strong>.`,
+      badgeColor: TYPE_CLR.minion.bdr
+    });
+  } else if (rid === "imp" || rid === "fanggu" || rid === "nodashi" || rid === "vortox" || rid === "vigormortis") {
+    // Demon kill targets
+    state.deathsLastNight.push(pIdx);
+    state.chronicle.push({
+      type: "night",
+      nightNum: state.dayNum,
+      title: "Demon Strike",
+      details: `The Demon targeted <strong>${pName}</strong>.`,
+      badgeColor: TYPE_CLR.demon.bdr
+    });
+  } else {
+    // General action log
+    state.chronicle.push({
+      type: "night",
+      nightNum: state.dayNum,
+      title: `${S().C[rid]?.name || rid} Action`,
+      details: `Target chosen: <strong>${pName}</strong>.`,
+      badgeColor: "var(--border)"
+    });
+  }
+
+  el.value = "";
+  autoSave();
   render();
 }
-function playAlarm() {
+
+function nextNightStep() {
+  state.activeWakeIdx++;
+  autoSave();
+  render();
+}
+
+function proceedToDay() {
+  state.phase = "day";
+  state.tab = "day";
+  state.activeWakeIdx = 0;
+  
+  // Apply overnight deaths
+  state.deathsLastNight.forEach(pIdx => {
+    state.alive[pIdx] = false;
+  });
+
+  // Chronicle day entry
+  state.chronicle.push({
+    type: "system",
+    dayNum: state.dayNum,
+    title: `Day ${state.dayNum} Rises`,
+    details: `The town wakes up to face Day ${state.dayNum}.`,
+    badgeColor: "var(--border)"
+  });
+
+  autoSave();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FLOW 6: DAY ANNOUNCEMENTS / MORNING BRIEF SCREEN (`Day Announcements.png`)
+// ══════════════════════════════════════════════════════════════════════════
+function renderDayScreen() {
+  let announcements = "";
+
+  // 1. Deaths Announcements
+  if (state.deathsLastNight.length > 0) {
+    state.deathsLastNight.forEach(pIdx => {
+      const pName = state.names[pIdx];
+      const rc = S().C[state.assignments[pIdx]];
+      announcements += `
+        <div class="card" style="display:flex;align-items:center;gap:16px;border-left:4px solid var(--red);padding:14px">
+          <input type="checkbox" style="width:18px;height:18px">
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase">Death Announcement</div>
+            <strong style="font-size:14px;color:var(--text)">${esc(pName)} (${rc?.name}) died last night.</strong>
+          </div>
+          <span style="font-size:20px">☠️</span>
+        </div>
+      `;
+    });
+  } else {
+    announcements += `
+      <div class="card" style="display:flex;align-items:center;gap:16px;border-left:4px solid var(--green);padding:14px">
+        <input type="checkbox" style="width:18px;height:18px">
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase">Peaceful Night</div>
+          <strong style="font-size:14px;color:var(--text)">No one died during the night.</strong>
+        </div>
+        <span style="font-size:20px">✨</span>
+      </div>
+    `;
+  }
+
+  // 2. Events & Reminders based on script
+  announcements += `
+    <div class="card" style="display:flex;align-items:center;gap:16px;border-left:4px solid var(--blue);padding:14px">
+      <input type="checkbox" style="width:18px;height:18px">
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase">Reminder</div>
+        <span style="font-size:13px;color:var(--text2)">Announce that public nominations are open now. Dead players retain 1 vote token!</span>
+      </div>
+      <span style="font-size:20px">🔔</span>
+    </div>
+  `;
+
+  return `
+    <div style="padding:16px">
+      <div style="margin-bottom:20px">
+        <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:4px;color:var(--orange)">☀️ Day ${state.dayNum}</h3>
+        <p style="color:var(--text3);font-size:13px">Morning Brief — check off announcements as they are delivered.</p>
+      </div>
+
+      <div style="margin-bottom:24px">${announcements}</div>
+
+      <button class="btn btn-primary" onclick="startTimerUI()">
+        ⏱ Start Discussion Timer (${formatTime(state.timerTotal)})
+      </button>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FLOW 7: DISCUSSION TIMER DIAL SCREEN (`Discussion Timer.png`)
+// ══════════════════════════════════════════════════════════════════════════
+function renderTimerScreen() {
+  const pct = state.timerTotal > 0 ? (state.timerSeconds / state.timerTotal) * 100 : 0;
+  
+  // Math for circular ring dial
+  const radius = 80;
+  const stroke = 8;
+  const normalizedRadius = radius - stroke * 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+
+  return `
+    <div style="padding:16px;text-align:center">
+      <div style="margin-bottom:20px">
+        <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:4px">Town Square</h3>
+        <p style="color:var(--text3);font-size:13px">Day Phase — private/public discussions.</p>
+      </div>
+
+      <!-- Circular Timer Dial -->
+      <div style="position:relative;width:200px;height:200px;margin:0 auto 28px;display:flex;align-items:center;justify-content:center">
+        <svg style="transform: rotate(-90deg);width:100%;height:100%">
+          <circle stroke="var(--border)" fill="transparent" stroke-width="${stroke}" r="${normalizedRadius}" cx="${radius}" cy="${radius}" style="transform: scale(1.25);transform-origin:center"/>
+          <circle stroke="var(--red)" fill="transparent" stroke-width="${stroke}" stroke-dasharray="${circumference} ${circumference}" style="stroke-dashoffset:${strokeDashoffset};transition: stroke-dashoffset 0.5s;transform: scale(1.25);transform-origin:center" r="${normalizedRadius}" cx="${radius}" cy="${radius}"/>
+        </svg>
+        <div style="position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:36px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums">${formatTime(state.timerSeconds)}</span>
+          <span style="font-size:10px;text-transform:uppercase;color:var(--text3);letter-spacing:1px">Remaining</span>
+        </div>
+      </div>
+
+      <!-- Timer controls -->
+      <div style="display:flex;justify-content:center;gap:20px;margin-bottom:28px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="adjustTimerVal(30)">+</button>
+          <span style="font-size:11px;color:var(--text3)">Add 30s</span>
+        </div>
+        
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="toggleTimerRunning()">
+            ${state.timerRunning ? '⏸' : '▶'}
+          </button>
+          <span style="font-size:11px;color:var(--text3)">${state.timerRunning ? 'Pause' : 'Start'}</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%;color:var(--red);border-color:var(--red)33" onclick="resetTimerVal()">■</button>
+          <span style="font-size:11px;color:var(--text3)">Reset</span>
+        </div>
+      </div>
+
+      <!-- Fast timeline trigger -->
+      <button class="btn btn-outline" style="width:100%;margin-bottom:12px" onclick="proceedToNightStep()">
+        🌙 Proceed to Night
+      </button>
+
+      <!-- Declare winner trigger -->
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-blue" style="flex:1;background:rgba(45, 90, 39, 0.1);color:var(--green);border-color:var(--green)33;margin:0" onclick="triggerWin('good')">😇 Good Wins</button>
+        <button class="btn btn-blue" style="flex:1;background:rgba(149, 27, 30, 0.1);color:var(--red);border-color:var(--red)33;margin:0" onclick="triggerWin('evil')">😈 Evil Wins</button>
+      </div>
+    </div>
+  `;
+}
+
+function startTimerUI() {
+  state.tab = "timer";
+  startTimerTicker();
+  render();
+}
+
+function startTimerTicker() {
+  if (state.timerIntervalId) clearInterval(state.timerIntervalId);
+  state.timerRunning = true;
+  state.timerIntervalId = setInterval(() => {
+    if (state.timerRunning && state.timerSeconds > 0) {
+      state.timerSeconds--;
+      if (state.timerSeconds === 0) {
+        state.timerRunning = false;
+        clearInterval(state.timerIntervalId);
+        playAlarmAudio();
+      }
+      autoSave();
+      render();
+    }
+  }, 1000);
+}
+
+function toggleTimerRunning() {
+  state.timerRunning = !state.timerRunning;
+  autoSave();
+  render();
+}
+
+function adjustTimerVal(seconds) {
+  state.timerSeconds += seconds;
+  state.timerTotal = Math.max(state.timerTotal, state.timerSeconds);
+  autoSave();
+  render();
+}
+
+function resetTimerVal() {
+  state.timerSeconds = 300;
+  state.timerTotal = 300;
+  state.timerRunning = false;
+  autoSave();
+  render();
+}
+
+function stopTimer() {
+  state.timerRunning = false;
+  if (state.timerIntervalId) {
+    clearInterval(state.timerIntervalId);
+    state.timerIntervalId = null;
+  }
+}
+
+function playAlarmAudio() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.2, 0.4].forEach(delay => {
-      const osc = ctx.createOscillator(); const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 880; gain.gain.value = 0.3;
-      osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + 0.12);
+    [0, 0.2, 0.4].forEach(d => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 600;
+      gain.gain.value = 0.25;
+      osc.start(ctx.currentTime + d);
+      osc.stop(ctx.currentTime + d + 0.15);
     });
-  } catch(e){}
+  } catch(e) {}
 }
 
-function renderTimer() {
-  if (!state.timer) initTimer();
-  const t = state.timer;
-  const pct = t.totalSeconds > 0 ? (t.seconds / t.totalSeconds * 100) : 0;
-  const clr = TIMER_PHASE_COLORS[t.phase];
-  const low = t.seconds <= 10 && t.seconds > 0;
-  const done = t.seconds === 0;
-
-  let dots = "";
-  TIMER_PHASES.forEach((name, i) => {
-    const cls = i === t.phase ? "current" : i < t.phase ? "done" : "";
-    dots += `<span class="timer-phase-dot ${cls}" onclick="timerSetPhase(${i})">${name}</span>`;
+function triggerWin(team) {
+  state.winTeam = team;
+  state.screen = "victory";
+  
+  // Log winning state to chronicle
+  state.chronicle.push({
+    type: "system",
+    title: "Tragedy Concluded",
+    details: `The Storyteller has declared victory for <strong>${team.toUpperCase()}</strong>!`,
+    badgeColor: team === "good" ? "var(--green)" : "var(--red)"
   });
 
-  let controls = "";
-  if (!t.running && !t.paused) {
-    controls = `<button class="timer-btn" style="border-color:var(--green);color:var(--green)" onclick="startTimer()">▶ Start</button>`;
-  } else if (t.running) {
-    controls = `<button class="timer-btn" style="border-color:var(--orange);color:var(--orange)" onclick="pauseTimer()">⏸ Pause</button>`;
-  } else {
-    controls = `<button class="timer-btn" style="border-color:var(--green);color:var(--green)" onclick="startTimer()">▶ Resume</button>`;
-  }
-  controls += `<button class="timer-btn" onclick="timerReset()">↻</button>`;
-  if (done || t.alarm) {
-    controls += `<button class="timer-btn" style="border-color:${TIMER_PHASE_COLORS[Math.min(t.phase+1,2)]};color:${TIMER_PHASE_COLORS[Math.min(t.phase+1,2)]}" onclick="timerAdvance()">${t.phase<2?'Next ▶':'Done'}</button>`;
-  }
-  controls += `<button class="timer-btn" onclick="state.timer.showSettings=!state.timer.showSettings;render()">⚙</button>`;
-
-  let settings = "";
-  if (t.showSettings) {
-    settings = `<div class="timer-settings">`;
-    const deltas = [30, 30, 5]; // seconds per adjustment per phase
-    TIMER_PHASES.forEach((name, i) => {
-      settings += `<div class="timer-setting-row">
-        <span style="color:${TIMER_PHASE_COLORS[i]}">${name}</span>
-        <div class="timer-adj">
-          <button class="timer-adj-btn" onclick="timerAdjust(${i},-${deltas[i]})">−</button>
-          <span class="timer-adj-val">${formatTime(t.durations[i])}</span>
-          <button class="timer-adj-btn" onclick="timerAdjust(${i},${deltas[i]})">+</button>
-        </div>
-      </div>`;
-    });
-    settings += `<button class="btn-outline" style="width:100%;margin-top:8px;font-size:11px" onclick="initTimer();render()">Reset to Defaults</button></div>`;
-  }
-
-  return `<div class="timer-wrap ${t.alarm?'timer-alarm':''}" id="timerWrap">
-    <div class="timer-phases">${dots}</div>
-    <div class="timer-phase-label" style="color:${clr}">${TIMER_PHASES[t.phase]}</div>
-    <div class="timer-display ${low?'timer-low':''} ${done?'timer-done':''}" id="timerDisplay" style="color:${done?'var(--red)':low?'var(--orange)':clr}">${formatTime(t.seconds)}</div>
-    <div class="timer-bar-track"><div class="timer-bar-fill" id="timerBar" style="width:${pct}%;background:${clr}"></div></div>
-    <div class="timer-controls">${controls}</div>
-    ${settings}
-  </div>`;
+  autoSave();
+  render();
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// NIGHT WALKER
-// ══════════════════════════════════════════════════════════════════════════
-
-// ── Show card helpers ──
-function showNumberCard(num) {
-  state.showCard = {
-    emoji: ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"][num] || "🔢",
-    title: String(num), fontSize: 72,
-    bg: "#0d0d1a", color: "#fff", borderColor: "#4a4a8a",
-  }; render();
-}
-function showYesNo(yes) {
-  state.showCard = {
-    emoji: yes ? "✅" : "❌", title: yes ? "YES" : "NO",
-    subtitle: yes ? "One IS the Demon (or Red Herring)" : "Neither is the Demon",
-    fontSize: 48, bg: yes?"#0e2e0e":"#2e0e0e",
-    color: yes?"#4ade80":"#ef4444", borderColor: yes?"#22c55e":"#dc2626",
-  }; render();
-}
-function showCharCard(charId) {
-  const s = S(); const ch = s.C[charId]; if (!ch) return;
-  const clr = TYPE_CLR[ch.type];
-  state.showCard = {
-    emoji: TEMOJI[ch.type], title: ch.name,
-    subtitle: ch.type.toUpperCase(), text: ch.ab,
-    bg: `linear-gradient(135deg,#0d0d1a,${clr.bg})`,
-    color: clr.txt, borderColor: clr.bdr,
-  }; render();
-}
-function showThisIsCard(roleName, subtitle) {
-  const s = S();
-  const ch = Object.values(s.C).find(c => c.name === roleName);
-  const clr = ch ? TYPE_CLR[ch.type] : TYPE_CLR.demon;
-  state.showCard = {
-    emoji: ch ? TEMOJI[ch.type] : "👹", title: roleName,
-    subtitle: subtitle || "YOU ARE", text: ch ? ch.ab : "",
-    bg: `linear-gradient(135deg,#0d0d1a,${clr.bg})`,
-    color: clr.txt, borderColor: clr.bdr,
-  }; render();
-}
-
-// ── Auto-calcs (TB) ──
-function calcChef() {
-  const gs = state.gs; const n = gs.players.length;
-  const c = S().C; let pairs = 0;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    if (c[gs.players[i].actual]?.team === "evil" && c[gs.players[j].actual]?.team === "evil") pairs++;
-  }
-  return pairs;
-}
-function calcEmpath(idx) {
-  const gs = state.gs; const n = gs.players.length; const c = S().C;
-  let cw = -1, ccw = -1;
-  for (let d = 1; d < n; d++) { const i = (idx+d)%n; if (gs.players[i].alive) { cw = i; break; } }
-  for (let d = 1; d < n; d++) { const i = (idx-d+n)%n; if (gs.players[i].alive) { ccw = i; break; } }
-  let count = 0;
-  if (cw >= 0 && c[gs.players[cw].actual]?.team === "evil") count++;
-  if (ccw >= 0 && ccw !== cw && c[gs.players[ccw].actual]?.team === "evil") count++;
-  return count;
-}
-function calcWasherwomanInfo() {
-  const gs = state.gs; const c = S().C;
-  return gs.players.filter(p => p.actual !== "drunk" && c[p.actual]?.type === "townsfolk")
-    .map(p => ({name:p.name, seat:p.seat, role:c[p.actual]?.name}));
-}
-function calcLibrarianInfo() {
-  const gs = state.gs; const c = S().C;
-  return gs.players.filter(p => c[p.actual]?.type === "outsider")
-    .map(p => ({name:p.name, seat:p.seat, role:c[p.actual]?.name}));
-}
-function calcInvestigatorInfo() {
-  const gs = state.gs; const c = S().C;
-  return gs.players.filter(p => c[p.actual]?.type === "minion")
-    .map(p => ({name:p.name, seat:p.seat, role:c[p.actual]?.name}));
-}
-
-// ── Build night steps ──
-function buildNightSteps() {
-  const gs = state.gs; const s = S(); const c = s.C;
-  const isFirst = gs.isFirstNight;
-  const steps = [];
-
-  const alivePlayers = gs.players.map((p,i) => ({...p,i})).filter(p => p.alive);
-  const findAlive = (id) => alivePlayers.filter(p => p.actual === id);
-  const findDrunkAs = (id) => alivePlayers.filter(p => p.actual === "drunk" && p.believed === id);
-
-  if (state.scriptId === "tb") {
-    buildTBNightSteps(gs, c, isFirst, steps, findAlive, findDrunkAs);
-  } else {
-    buildBMRNightSteps(gs, c, isFirst, steps, findAlive, findDrunkAs);
-  }
-  return steps;
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// TB NIGHT STEPS
-// ══════════════════════════════════════════════════════════════════════════
-function buildTBNightSteps(gs, c, isFirst, steps, findAlive, findDrunkAs) {
-  const order = isFirst ? TB_FIRST_NIGHT : TB_OTHER_NIGHT;
-
-  if (isFirst && gs.players.length >= 7) {
-    const minions = gs.players.filter(p => c[p.actual]?.type === "minion");
-    const demon = gs.players.find(p => c[p.actual]?.type === "demon");
-    steps.push({
-      title: "🤝 Minion Info", type: "info",
-      instr: `Wake ALL Minions together. Show "This is the Demon" — point to <strong>${demon?.name||"?"}</strong>.`,
-      who: minions.map(m => `${m.name} (${c[m.actual]?.name})`).join(", "),
-    });
-    steps.push({
-      title: "😈 Demon Info", type: "evil",
-      instr: `Wake the Demon. Show Minions. Then show 3 bluffs.`,
-      who: `${demon?.name||"?"} (Imp)`,
-      extra: `Bluffs: <strong>${gs.bluffs.map(b=>c[b]?.name||b).join(", ")}</strong>`,
-      showType: "bluffs", bluffIds: gs.bluffs,
-    });
-  }
-
-  order.forEach(entry => {
-    if (entry.id.startsWith("_")) return;
-    const ch = c[entry.id]; if (!ch) return;
-    const direct = findAlive(entry.id);
-    const drunk = findDrunkAs(entry.id);
-
-    [...direct, ...drunk].forEach(p => {
-      const isDrunk = p.actual === "drunk";
-      const instrText = isFirst ? ch.fn_r : ch.on_r;
-      if (!instrText && !isFirst) return;
-
-      const step = {
-        title: `${TEMOJI[ch.type]} ${ch.name}`,
-        type: ch.team === "evil" ? "evil" : "good",
-        instr: instrText || ch.ab,
-        who: `${p.name} (Seat ${p.i+1})`,
-        warn: isDrunk ? "⚠️ DRUNK — give FALSE info!" : (p.poisoned ? "⚠️ POISONED — give FALSE info!" : null),
-      };
-
-      // ─── POISONER ───
-      if (entry.id === "poisoner") {
-        step.showType = "action_pick";
-        step.actionFn = "nightAction_poison";
-        step.actionLabel = "☠️ Poison";
-        step.actionDone = gs.players.some(pp => pp.poisonSource === "poisoner");
-        if (step.actionDone) {
-          const victim = gs.players.find(pp => pp.poisonSource === "poisoner");
-          const vi = gs.players.indexOf(victim);
-          step.actionStatus = `☠️ Poisoning: <strong>${victim.name}</strong> (Seat ${vi+1})`;
-        }
-      }
-
-      // ─── MONK ───
-      if (entry.id === "monk") {
-        step.showType = "action_pick";
-        step.actionFn = "nightAction_monkProtect";
-        step.actionLabel = "🛡️ Protect";
-        const prot = gs.players.find(pp => pp.protected && pp.actual !== "monk");
-        if (prot) {
-          step.actionDone = true;
-          step.actionStatus = `🛡️ Protecting: <strong>${prot.name}</strong>`;
-        }
-      }
-
-      // ─── BUTLER ───
-      if (entry.id === "butler") {
-        step.showType = "action_pick";
-        step.actionFn = "nightAction_butlerMaster";
-        step.actionLabel = "👑 Set Master";
-        step.actionExclude = [p.i]; // Can't pick self
-        const master = gs.players.find(pp => pp.master);
-        if (master) {
-          step.actionDone = true;
-          step.actionStatus = `👑 Master: <strong>${master.name}</strong>`;
-        }
-      }
-
-      // ─── SPY ───
-      if (entry.id === "spy") { step.showType = "grimoire"; }
-
-      // ─── CHEF ───
-      if (entry.id === "chef") {
-        step.showType = "number"; step.maxNum = 3;
-        const v = calcChef();
-        step.stHint = `🧮 TRUE: <strong>${v}</strong> evil pair${v!==1?"s":""}`;
-        if (isDrunk || p.poisoned) step.stHint += `<br>⚠️ Give WRONG number!`;
-      }
-
-      // ─── EMPATH ───
-      if (entry.id === "empath") {
-        step.showType = "number"; step.maxNum = 2;
-        const v = calcEmpath(p.i);
-        step.stHint = `🧮 TRUE: <strong>${v}</strong> evil neighbor${v!==1?"s":""}`;
-        if (isDrunk || p.poisoned) step.stHint += `<br>⚠️ Give WRONG number!`;
-      }
-
-      // ─── FORTUNE TELLER ───
-      if (entry.id === "fortuneteller") {
-        step.showType = "yesno";
-        const rh = gs.redHerring >= 0 ? gs.players[gs.redHerring] : null;
-        step.stHint = rh ? `🎯 Red Herring: <strong>${rh.name}</strong> (Seat ${gs.redHerring+1})` : `🎯 No Red Herring`;
-        if (isDrunk || p.poisoned) step.stHint += `<br>⚠️ Answer can be anything!`;
-      }
-
-      // ─── WASHERWOMAN ───
-      if (entry.id === "washerwoman") {
-        step.showType = "character_pick";
-        step.pickFrom = Object.values(c).filter(ch2 => ch2.type === "townsfolk").map(ch2 => ch2.id);
-        const info = calcWasherwomanInfo();
-        step.stHint = `📋 TRUE:<br>` + info.map(x => `• <strong>${x.name}</strong> (Seat ${x.seat}) = ${x.role}`).join("<br>");
-        if (isDrunk || p.poisoned) step.stHint += `<br>⚠️ Show anything (all can be wrong)!`;
-      }
-
-      // ─── LIBRARIAN ───
-      if (entry.id === "librarian") {
-        step.showType = "character_pick";
-        step.pickFrom = Object.values(c).filter(ch2 => ch2.type === "outsider").map(ch2 => ch2.id);
-        const info = calcLibrarianInfo();
-        step.stHint = info.length === 0 ? `📋 No Outsiders — show 0` :
-          `📋 TRUE:<br>` + info.map(x => `• <strong>${x.name}</strong> (Seat ${x.seat}) = ${x.role}`).join("<br>");
-        if (isDrunk || p.poisoned) step.stHint += `<br>⚠️ Show anything!`;
-      }
-
-      // ─── INVESTIGATOR ───
-      if (entry.id === "investigator") {
-        step.showType = "character_pick";
-        step.pickFrom = Object.values(c).filter(ch2 => ch2.type === "minion").map(ch2 => ch2.id);
-        const info = calcInvestigatorInfo();
-        step.stHint = `📋 TRUE:<br>` + info.map(x => `• <strong>${x.name}</strong> (Seat ${x.seat}) = ${x.role}`).join("<br>");
-        if (isDrunk || p.poisoned) step.stHint += `<br>⚠️ Show anything!`;
-      }
-
-      // ─── UNDERTAKER ───
-      if (entry.id === "undertaker" && gs.executedToday !== null) {
-        const ex = gs.players[gs.executedToday];
-        step.extra = `Executed: <strong>${ex.name}</strong> — show <strong>${c[ex.actual]?.name}</strong>`;
-        step.showType = "auto_character"; step.autoCharId = ex.actual;
-      }
-
-      // ─── IMP ───
-      if (entry.id === "imp") {
-        step.showType = "imp_kill";
-        const soldier = gs.players.find(pp => pp.alive && pp.actual === "soldier");
-        const prot = gs.players.filter(pp => pp.alive && pp.protected);
-        let notes = [];
-        if (soldier) notes.push(`⚔️ ${soldier.name} = SOLDIER`);
-        prot.forEach(pp => notes.push(`🛡️ ${pp.name} = PROTECTED`));
-        if (notes.length) step.extra = notes.join("<br>");
-      }
-
-      // ─── SCARLET WOMAN ───
-      if (!isFirst && entry.id === "scarletwoman") {
-        if (gs.executedToday !== null && c[gs.players[gs.executedToday].actual]?.type === "demon") {
-          const aliveCount = gs.players.filter(pp=>pp.alive).length;
-          if (aliveCount >= 5 && p.alive) {
-            step.showType = "you_are";
-            step.warn = `Demon executed! ${aliveCount} alive ≥ 5. Show SW she's the Imp.`;
-          } else return;
-        } else return;
-      }
-
-      // ─── RAVENKEEPER ───
-      if (!isFirst && entry.id === "ravenkeeper") {
-        if (!gs.diedTonight.includes(p.i)) return;
-        step.condition = "⚰️ Died tonight — gets to use ability";
-        step.showType = "ravenkeeper_pick";
-      }
-
-      steps.push(step);
-    });
-  });
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// BMR NIGHT STEPS
-// ══════════════════════════════════════════════════════════════════════════
-function buildBMRNightSteps(gs, c, isFirst, steps, findAlive, findDrunkAs) {
-  const order = isFirst ? BMR_FIRST_NIGHT : BMR_OTHER_NIGHT;
-  const alivePlayers = gs.players.map((p,i)=>({...p,i})).filter(p=>p.alive);
-
-  order.forEach(entry => {
-    const id = entry.id;
-
-    // ─── SPECIAL STEPS ───
-    if (id === "_minioninfo" && isFirst && gs.players.length >= 7) {
-      const minions = gs.players.filter(p => c[p.actual]?.type === "minion");
-      const demon = gs.players.find(p => c[p.actual]?.type === "demon");
-      steps.push({
-        title: "🤝 Minion Info", type: "info",
-        instr: `Wake ALL Minions. Show "This is the Demon" — point to <strong>${demon?.name||"?"}</strong>.`,
-        who: minions.map(m => `${m.name} (${c[m.actual]?.name})`).join(", "),
-      });
-      return;
-    }
-    if (id === "_demoninfo" && isFirst && gs.players.length >= 7) {
-      const demon = gs.players.find(p => c[p.actual]?.type === "demon");
-      steps.push({
-        title: "😈 Demon Info", type: "evil",
-        instr: `Wake Demon. Show Minions. Show 3 bluffs.`,
-        who: `${demon?.name||"?"} (${c[demon?.actual]?.name||"?"})`,
-        extra: `Bluffs: <strong>${gs.bluffs.map(b=>c[b]?.name||b).join(", ")}</strong>`,
-        showType: "bluffs", bluffIds: gs.bluffs,
-      });
-      return;
-    }
-    if (id === "lunatic_info" && isFirst) {
-      const lunatic = gs.players.find(p => p.actual === "lunatic");
-      if (!lunatic) return;
-      steps.push({
-        title: "🌙 Lunatic (Info)", type: "good",
-        instr: `Show Lunatic fake Minion info + 3 bluffs (as if they are the Demon). Then wake real Demon and show them who the Lunatic is.`,
-        who: `${lunatic.name} (Seat ${lunatic.seat})`,
-        warn: "⚠️ The Lunatic thinks they are the Demon! Give fake info.",
-      });
-      return;
-    }
-    if (id === "lunatic_action" && isFirst) {
-      const lunatic = gs.players.find(p => p.actual === "lunatic");
-      if (!lunatic) return;
-      steps.push({
-        title: "🌙 Lunatic (Action)", type: "good",
-        instr: `Lunatic does fake demon attacks. Then show real Demon who the Lunatic chose.`,
-        who: `${lunatic.name} (Seat ${lunatic.seat})`,
-        warn: "⚠️ Nobody actually dies from the Lunatic's choice.",
-      });
-      return;
-    }
-    if (id === "_minstrel" && !isFirst) {
-      const minstrel = findAlive("minstrel");
-      if (minstrel.length === 0) return;
-      steps.push({
-        title: "🎵 Minstrel (cleanup)", type: "info",
-        instr: gs.minstrelAllDrunk
-          ? `Minstrel triggered! ALL players are drunk until dusk. Clear the drunk status now.`
-          : `No Minion was executed yesterday. No Minstrel effect.`,
-        who: `${minstrel[0].name} (Seat ${minstrel[0].i+1})`,
-      });
-      return;
-    }
-    if (id === "_grandmother" && !isFirst) {
-      if (gs.grandchildIdx < 0) return;
-      const gc = gs.players[gs.grandchildIdx];
-      const gm = gs.players.find(p => p.actual === "grandmother" && p.alive);
-      if (!gm || !gc) return;
-      if (gs.diedTonight.includes(gs.grandchildIdx)) {
-        // Check if demon killed the grandchild
-        steps.push({
-          title: "👵 Grandmother (passive)", type: "info",
-          instr: `Grandchild (${gc.name}) died tonight! If killed by the Demon, Grandmother (${gm.name}) also dies.`,
-          who: `${gm.name}`,
-          warn: "⚠️ Kill Grandmother if the Demon killed the grandchild.",
-        });
-      }
-      return;
-    }
-    if (id === "_goon") {
-      const goon = gs.players.find(p => p.actual === "goon");
-      if (!goon || !goon.alive) return;
-      steps.push({
-        title: "🔄 Goon (passive)", type: "info",
-        instr: `If anyone chose the Goon tonight, the FIRST chooser is drunk until dusk and the Goon becomes their alignment.`,
-        who: `${goon.name} (Seat ${goon.seat})`,
-      });
-      return;
-    }
-
-    // ─── DEMON STEP ───
-    if (id === "_demon" && !isFirst) {
-      const demonType = gs.demonType;
-      const demon = gs.players.find(p => p.actual === demonType && p.alive);
-      if (!demon) return;
-      const dIdx = gs.players.indexOf(demon);
-
-      // Check Exorcist block
-      if (gs.exorcistTarget === dIdx) {
-        let blockNote = "";
-        // Pukka: previous victim still dies even if exorcised
-        if (demonType === "pukka" && gs.pukkaVictimIdx >= 0) {
-          const prev = gs.players[gs.pukkaVictimIdx];
-          blockNote = `<br>⚠️ Pukka's previous victim (${prev?.name}) still dies! Exorcist only blocks the NEW poison.`;
-        }
-        // Po: loses charge if exorcised
-        if (demonType === "po" && gs.poCharged) {
-          blockNote = `<br>⚠️ Po was charged — charge is LOST.`;
-        }
-        const blockStep = {
-          title: `👹 ${c[demonType]?.name} (BLOCKED)`, type: "evil",
-          instr: `Exorcist targeted the Demon! The Demon does NOT wake tonight.${blockNote}`,
-          who: `${demon.name} (${c[demonType]?.name})`,
-          warn: "✝️ Exorcist blocks the Demon's active ability.",
-        };
-        // Pukka prev victim still needs resolution even when blocked
-        if (demonType === "pukka" && gs.pukkaVictimIdx >= 0) {
-          blockStep.showType = "pukka_prev_only";
-        }
-        // Po loses charge
-        if (demonType === "po" && gs.poCharged) {
-          blockStep.showType = "po_lose_charge";
-        }
-        steps.push(blockStep);
-        return;
-      }
-
-      const step = {
-        title: `👹 ${c[demonType]?.name}`, type: "evil",
-        instr: c[demonType]?.on_r || c[demonType]?.ab,
-        who: `${demon.name} (Seat ${demon.seat})`,
-      };
-
-      // Demon-specific showTypes
-      if (demonType === "zombuul") {
-        if (gs.executedToday !== null || gs.diedTonight.length > 0) {
-          step.warn = "Someone died today — Zombuul does NOT kill tonight.";
-          step.showType = null;
-        } else {
-          step.showType = "demon_kill";
-        }
-      }
-      if (demonType === "po") {
-        step.showType = "po_pick";
-      }
-      if (demonType === "shabaloth") {
-        step.showType = "shabaloth_pick";
-      }
-      if (demonType === "pukka") {
-        step.showType = "pukka_pick";
-      }
-      steps.push(step);
-      return;
-    }
-
-    // ─── REGULAR STEPS ───
-    const ch = c[id]; if (!ch) return;
-
-    // Lunatic on other nights
-    if (id === "lunatic" && !isFirst) {
-      const lunatic = gs.players.find(p => p.actual === "lunatic" && p.alive);
-      if (!lunatic) return;
-      steps.push({
-        title: `🌙 Lunatic`, type: "good",
-        instr: ch.on_r || ch.ab,
-        who: `${lunatic.name} (Seat ${lunatic.seat})`,
-        warn: "⚠️ Lunatic thinks they're the Demon. Show real Demon their choices.",
-      });
-      return;
-    }
-
-    const direct = findAlive(id);
-    const drunk = findDrunkAs(id);
-
-    [...direct, ...drunk].forEach(p => {
-      const isDrunk = p.actual === "drunk";
-      const instrText = isFirst ? ch.fn_r : ch.on_r;
-      if (!instrText) return;
-
-      const step = {
-        title: `${TEMOJI[ch.type]} ${ch.name}`,
-        type: ch.team === "evil" ? "evil" : "good",
-        instr: instrText,
-        who: `${p.name} (Seat ${p.i+1})`,
-        warn: isDrunk ? "⚠️ DRUNK — give FALSE info!" : (p.poisoned ? "⚠️ POISONED — give FALSE info!" : null),
-      };
-
-      // ─── SAILOR ───
-      if (id === "sailor") {
-        step.showType = "action_pick";
-        step.actionFn = "nightAction_sailorDrunk";
-        step.actionLabel = "🍺 Make Drunk";
-        step.actionExclude = [p.i]; // Can't pick self
-        const drunkTarget = gs.players.find(pp => pp.drunkSource === "Sailor");
-        if (drunkTarget) {
-          step.actionDone = true;
-          step.actionStatus = `🍺 Drunk: <strong>${drunkTarget.name}</strong>`;
-        }
-      }
-
-      // ─── COURTIER ───
-      if (id === "courtier") {
-        if (gs.courtierUsed) {
-          step.instr = `Courtier already used their ability.`;
-          if (gs.courtierTimer > 0) step.extra = `⏱️ Timer: ${gs.courtierTimer} nights remaining. Target: ${gs.courtierTarget ? c[gs.courtierTarget]?.name : "?"}`;
-          step.warn = null;
-          steps.push(step);
-          return;
-        }
-        step.showType = "courtier_pick";
-      }
-
-      // ─── INNKEEPER ───
-      if (id === "innkeeper" && !isFirst) {
-        step.showType = "innkeeper_pick";
-      }
-
-      // ─── GAMBLER ───
-      if (id === "gambler" && !isFirst) {
-        step.showType = "gambler_pick";
-        step.gamblerId = p.i;
-      }
-
-      // ─── DEVIL'S ADVOCATE ───
-      if (id === "devilsadvocate") {
-        step.showType = "action_pick";
-        step.actionFn = "nightAction_daProtect";
-        step.actionLabel = "⚖️ DA Protect";
-        // DA can't pick same player 2 nights in a row
-        step.actionExclude = gs.daLastTarget >= 0 ? [gs.daLastTarget] : [];
-        if (gs.daTarget >= 0) {
-          step.actionDone = true;
-          step.actionStatus = `⚖️ DA Protecting: <strong>${gs.players[gs.daTarget].name}</strong>`;
-        }
-        if (gs.daLastTarget >= 0) {
-          step.stHint = `Cannot choose <strong>${gs.players[gs.daLastTarget]?.name}</strong> (last night's target).`;
-        }
-      }
-
-      // ─── EXORCIST ───
-      if (id === "exorcist" && !isFirst) {
-        step.showType = "action_pick";
-        step.actionFn = "nightAction_exorcistPick";
-        step.actionLabel = "✝️ Exorcise";
-        if (gs.exorcistTarget >= 0) {
-          step.actionDone = true;
-          step.actionStatus = `✝️ Exorcising: <strong>${gs.players[gs.exorcistTarget].name}</strong>`;
-        }
-      }
-
-      // ─── CHAMBERMAID ───
-      if (id === "chambermaid") {
-        step.showType = "number"; step.maxNum = 2;
-      }
-
-      // ─── GRANDMOTHER (first night) ───
-      if (id === "grandmother" && isFirst && gs.grandchildIdx >= 0) {
-        const gc = gs.players[gs.grandchildIdx];
-        step.stHint = `👶 Grandchild: <strong>${gc.name}</strong> (Seat ${gc.seat}) — ${c[gc.actual]?.name}`;
-        step.showType = "player_pick";
-        if (isDrunk || p.poisoned) step.stHint += `<br>⚠️ Show wrong player/character!`;
-      }
-
-      // ─── GODFATHER (first night) ───
-      if (id === "godfather" && isFirst) {
-        const outsiders = gs.outsidersInPlay || [];
-        step.stHint = `🌿 Outsiders in play: ${outsiders.map(o => c[o]?.name||o).join(", ") || "None"}`;
-      }
-
-      // ─── GODFATHER (other night — kills if outsider died) ───
-      if (id === "godfather" && !isFirst) {
-        const exIdx = gs.executedToday;
-        const outsiderDied = exIdx !== null && c[gs.players[exIdx]?.actual]?.type === "outsider";
-        const nightOutsiderDied = gs.diedTonight.some(idx => c[gs.players[idx]?.actual]?.type === "outsider");
-        if (!outsiderDied && !nightOutsiderDied) return;
-        step.showType = "demon_kill";
-      }
-
-      // ─── ASSASSIN ───
-      if (id === "assassin" && !isFirst) {
-        if (gs.assassinUsed) return;
-        step.showType = "assassin_pick";
-      }
-
-      // ─── PROFESSOR ───
-      if (id === "professor" && !isFirst) {
-        if (gs.professorUsed) return;
-        step.showType = "professor_pick";
-      }
-
-      // ─── GOSSIP ───
-      if (id === "gossip" && !isFirst) {
-        const trueGossips = (gs.gossipStatements||[]).filter(g => g.resolved && g.isTrue);
-        if (trueGossips.length === 0) {
-          step.instr = "No true gossip statements today — no kill.";
-        } else {
-          step.showType = "demon_kill";
-          step.extra = `TRUE gossip! "${trueGossips[0].text}" — choose someone to die.`;
-        }
-      }
-
-      // ─── TINKER ───
-      if (id === "tinker") {
-        step.instr = "You may kill the Tinker. Or not. Your choice.";
-        step.showType = "demon_kill";
-      }
-
-      // ─── MOONCHILD ───
-      if (id === "moonchild" && !isFirst) {
-        const mcDied = gs.diedTonight.some(idx => gs.players[idx].actual === "moonchild");
-        if (!mcDied) return;
-        step.condition = "⚰️ Moonchild died tonight";
-        step.showType = "moonchild_pick";
-      }
-
-      steps.push(step);
-    });
-  });
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// RENDER SHOW CARDS (in night walker steps)
-// ══════════════════════════════════════════════════════════════════════════
-function renderStepShowCards(step) {
-  if (!step || !step.showType) return "";
-  const gs = state.gs; const s = S(); const c = s.C;
-
-  // Section header varies by type
-  const isAction = step.showType.startsWith("action_") || ["courtier_pick","innkeeper_pick","gambler_pick",
-    "assassin_pick","professor_pick","moonchild_pick","pukka_pick","po_pick","shabaloth_pick",
-    "pukka_prev_only","po_lose_charge","ravenkeeper_pick"].includes(step.showType);
-  const sectionLabel = isAction ? "🎯 Action" : "📋 Show to Player";
-
-  let html = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">
-    <div style="font-size:11px;font-weight:700;color:${isAction?'var(--orange)':'var(--blue)'};margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">${sectionLabel}</div>`;
-
-  // Helper: alive player buttons
-  function alivePlayerBtns(onclick, exclude, opts) {
-    let h = "";
-    const ex = exclude || [];
-    const showBadges = opts?.badges !== false;
-    gs.players.forEach((p, idx) => {
-      if (!p.alive) return;
-      if (ex.includes(idx)) return;
-      const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-      let badge = "";
-      if (showBadges) {
-        if (p.poisoned) badge += ' <span style="color:var(--purple);font-size:10px">☠️</span>';
-        if (p.protected) badge += ' <span style="color:var(--blue);font-size:10px">🛡️</span>';
-        if (p.daProtected) badge += ' <span style="color:var(--orange);font-size:10px">⚖️</span>';
-        if (p.drunkSource) badge += ' <span style="color:var(--teal);font-size:10px">🍺</span>';
-        if (p.actual === "soldier") badge += ' <span style="color:var(--orange);font-size:10px">⚔️</span>';
-        if (p.actual === "sailor" && !p.drunkSource && !p.poisoned) badge += ' <span style="color:var(--teal);font-size:10px">⛵</span>';
-      }
-      const fn = onclick.replace("IDX", idx);
-      h += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;display:flex;justify-content:space-between;align-items:center" onclick="${fn}">
-        <span><span style="color:var(--text3)">${idx+1}.</span> ${esc(p.name)} <span style="color:${clr.txt};font-size:11px">(${ch2?.name})</span>${badge}</span>
-        <span style="color:var(--text3);font-size:12px">${opts?.icon||"→"}</span></button>`;
-    });
-    return h;
-  }
-
-  // Helper: dead player buttons
-  function deadPlayerBtns(onclick) {
-    let h = "";
-    gs.players.forEach((p, idx) => {
-      if (p.alive) return;
-      const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-      const fn = onclick.replace("IDX", idx);
-      h += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;opacity:0.7" onclick="${fn}">
-        <span style="color:var(--text3)">${idx+1}.</span> ${esc(p.name)} <span style="color:${clr.txt};font-size:11px">(${ch2?.name})</span> ⚰️</button>`;
-    });
-    return h;
-  }
-
-  // Helper: kill buttons (with protection badges)
-  function killPlayerBtns(onclick, exclude) {
-    let h = `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Choose target to kill:</div>`;
-    const ex = exclude || [];
-    gs.players.forEach((p, idx) => {
-      if (!p.alive || ex.includes(idx)) return;
-      const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-      let badge = "";
-      if (p.actual === "soldier") badge = ' <span style="color:var(--orange);font-size:10px">⚔️ SOLDIER</span>';
-      if (p.protected) badge = ' <span style="color:var(--blue);font-size:10px">🛡️ PROTECTED</span>';
-      if (ch2?.type === "demon") badge = ' <span style="color:var(--red);font-size:10px">👹 SELF</span>';
-      if (p.actual === "sailor" && !p.drunkSource && !p.poisoned) badge = ' <span style="color:var(--teal);font-size:10px">⛵ SAILOR</span>';
-      const fn = onclick.replace("IDX", idx);
-      h += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;display:flex;justify-content:space-between;align-items:center" onclick="${fn}">
-        <span><span style="color:var(--text3)">${idx+1}.</span> ${esc(p.name)} <span style="color:${clr.txt};font-size:11px">(${ch2?.name})</span>${badge}</span>
-        <span style="color:var(--red)">💀</span></button>`;
-    });
-    h += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:rgba(39,174,96,0.3);color:var(--green);font-style:italic" onclick="markNoDeath()">🛡️ No death (blocked)</button>`;
-    return h;
-  }
-
-  switch (step.showType) {
-
-    // ═══════════════════════════════
-    // ORIGINAL SHOW TYPES (unchanged)
-    // ═══════════════════════════════
-    case "number": {
-      html += `<div class="choice-grid">`;
-      for (let n = 0; n <= (step.maxNum||3); n++)
-        html += `<button class="choice-btn" onclick="showNumberCard(${n})">${n}</button>`;
-      html += `</div>`;
-      break;
-    }
-    case "yesno": {
-      html += `<div class="choice-grid">
-        <button class="choice-btn" style="flex:1;color:#4ade80;border-color:#22c55e" onclick="showYesNo(true)">✅ YES</button>
-        <button class="choice-btn" style="flex:1;color:#ef4444;border-color:#dc2626" onclick="showYesNo(false)">❌ NO</button>
-      </div>`;
-      break;
-    }
-    case "character_pick": {
-      (step.pickFrom||[]).forEach(id => {
-        const ch2 = c[id]; if (!ch2) return;
-        const clr = TYPE_CLR[ch2.type];
-        html += `<button class="char-choice-btn" style="margin-bottom:4px;border-color:${clr.bdr}44;color:${clr.txt}" onclick="showCharCard('${id}')">
-          ${TEMOJI[ch2.type]} ${ch2.name}</button>`;
-      });
-      break;
-    }
-    case "auto_character": {
-      const ch2 = c[step.autoCharId]; if (!ch2) break;
-      const clr = TYPE_CLR[ch2.type];
-      html += `<button class="char-choice-btn" style="border-color:${clr.bdr};color:${clr.txt};font-size:14px;text-align:center;padding:12px" onclick="showCharCard('${step.autoCharId}')">
-        ${TEMOJI[ch2.type]} Show: <strong>${ch2.name}</strong></button>`;
-      break;
-    }
-    case "player_pick": {
-      gs.players.forEach((p, idx) => {
-        const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-        html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44" onclick="showCharCard('${p.actual}')">
-          <span style="color:var(--text3)">${idx+1}.</span> ${esc(p.name)} <span style="color:${clr.txt};font-size:11px">(${ch2?.name})</span></button>`;
-      });
-      break;
-    }
-    case "bluffs": {
-      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Tap each to show:</div>`;
-      (step.bluffIds||[]).forEach(id => {
-        const ch2 = c[id]; if (!ch2) return;
-        const clr = TYPE_CLR[ch2.type];
-        html += `<button class="char-choice-btn" style="margin-bottom:4px;border-color:${clr.bdr}44;color:${clr.txt}" onclick="showCharCard('${id}')">
-          ${TEMOJI[ch2.type]} ${ch2.name}</button>`;
-      });
-      break;
-    }
-    case "grimoire": {
-      html += `<button class="char-choice-btn" style="text-align:center;border-color:var(--indigo);color:var(--indigo);font-size:14px;padding:12px" onclick="state.tab='grimoire';render()">📖 Open Grimoire (show Spy your screen)</button>`;
-      break;
-    }
-    case "you_are": {
-      html += `<button class="char-choice-btn" style="text-align:center;border-color:${TYPE_CLR.demon.bdr};color:${TYPE_CLR.demon.txt};font-size:14px;padding:12px" onclick="showThisIsCard('Imp','YOU ARE NOW THE')">
-        👹 Show: "You are the Imp"</button>`;
-      break;
-    }
-    case "imp_kill":
-    case "demon_kill": {
-      if (gs.nightKillDone && step.showType === "imp_kill") {
-        html += `<div style="padding:10px;border-radius:8px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.2);color:var(--red);font-size:13px;font-weight:600">
-          💀 Kill resolved${gs.diedTonight.length===0?" (blocked)":""}</div>`;
-      } else {
-        html += killPlayerBtns("killFromNightWalker(IDX)");
-      }
-      break;
-    }
-
-    // ═══════════════════════════════════════
-    // NEW ACTION TYPES — inline state changes
-    // ═══════════════════════════════════════
-
-    // Generic: pick a player → call action function
-    case "action_pick": {
-      if (step.actionDone && step.actionStatus) {
-        html += `<div style="padding:10px;border-radius:8px;background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.2);color:var(--green);font-size:13px;margin-bottom:6px">
-          ${step.actionStatus}</div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Change:</div>`;
-      }
-      html += alivePlayerBtns(`${step.actionFn}(IDX)`, step.actionExclude, {icon: step.actionLabel||"→"});
-      break;
-    }
-
-    // TB: Ravenkeeper — pick player, show their character
-    case "ravenkeeper_pick": {
-      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Player picks someone to learn their character:</div>`;
-      html += alivePlayerBtns("nightAction_ravenkeeperPick(IDX)", [], {icon:"🔍"});
-      break;
-    }
-
-    // BMR: Courtier — pick character (not player) to make drunk
-    case "courtier_pick": {
-      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Choose a CHARACTER to make drunk for 3 nights:</div>`;
-      const inPlayIds = new Set(gs.players.map(p => p.actual));
-      Object.values(c).filter(ch => inPlayIds.has(ch.id)).forEach(ch2 => {
-        const clr = TYPE_CLR[ch2.type];
-        html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;color:${clr.txt}" onclick="nightAction_courtierPick('${ch2.id}')">
-          ${TEMOJI[ch2.type]} ${ch2.name}</button>`;
-      });
-      html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--text3);color:var(--text3);font-style:italic" onclick="nightAction_courtierPick('none')">Skip (don't use ability yet)</button>`;
-      break;
-    }
-
-    // BMR: Innkeeper — pick 2 to protect, then 1 of them to drunk
-    case "innkeeper_pick": {
-      const phase = state.nightStepData.innkeeperPhase;
-      const picks = state.nightStepData.innkeeperPicks || [];
-
-      if (phase === "drunk") {
-        html += `<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:6px">✅ Protecting: ${picks.map(idx=>gs.players[idx].name).join(" & ")}</div>`;
-        const drunkCount = gs.players.filter(p => p.drunkSource).length;
-        if (drunkCount >= 1) {
-          html += `<div class="warn warn-red" style="margin-bottom:6px;padding:8px;border-radius:6px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.3)">⚠️ WARNING: There are already ${drunkCount} drunk players in the game (Usually max 2).</div>`;
-        }
-        html += `<div style="font-size:12px;color:var(--orange);margin-bottom:6px">Now choose which one is DRUNK:</div>`;
-        picks.forEach(idx => {
-          const p = gs.players[idx]; const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-          const warnClick = drunkCount >= 1 ? `if(confirm('There are already ${drunkCount} drunk players. Make ${esc(p.name).replace(/'/g, "\\'")} drunk anyway?')) ` : ``;
-          html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:var(--orange);color:var(--orange)" onclick="${warnClick}nightAction_innkeeperDrunk(${idx})">
-            🍺 ${esc(p.name)} (${ch2?.name})</button>`;
-        });
-        html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--text3);color:var(--text3)" onclick="nightAction_innkeeperReset()">↩ Reset</button>`;
-      } else {
-        html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Choose 2 players to protect (${picks.length}/2):</div>`;
-        if (picks.length > 0) {
-          html += `<div style="font-size:11px;color:var(--green);margin-bottom:4px">Selected: ${picks.map(idx=>gs.players[idx].name).join(", ")}</div>`;
-        }
-        html += alivePlayerBtns("nightAction_innkeeperPick(IDX)", picks, {icon:"🛡️"});
-        if (picks.length > 0) {
-          html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--text3);color:var(--text3)" onclick="nightAction_innkeeperReset()">↩ Reset</button>`;
-        }
-      }
-      break;
-    }
-
-    // BMR: Gambler — pick player, ST decides if guess was right
-    case "gambler_pick": {
-      const gamblerId = step.gamblerId;
-      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Gambler guesses a player's character. Was the guess correct?</div>`;
-      html += `<div class="choice-grid" style="margin-bottom:8px">
-        <button class="choice-btn" style="flex:1;color:#4ade80;border-color:#22c55e" onclick="state.gs.log.push('Night '+state.gs.dayNum+': Gambler guessed correctly.');autoSave();render()">✅ Correct</button>
-        <button class="choice-btn" style="flex:1;color:#ef4444;border-color:#dc2626" onclick="nightAction_gamblerDies(${gamblerId})">❌ Wrong — dies!</button>
-      </div>`;
-      break;
-    }
-
-    // BMR: Assassin — kill (bypasses ALL protection, once per game)
-    case "assassin_pick": {
-      html += `<div style="padding:8px;border-radius:6px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.2);color:var(--red);font-size:12px;font-weight:600;margin-bottom:8px">
-        💀 ONE-TIME ABILITY — Bypasses ALL protection!</div>`;
-      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Choose target (or skip):</div>`;
-      gs.players.forEach((p, idx) => {
-        if (!p.alive) return;
-        const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-        html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;display:flex;justify-content:space-between;align-items:center" onclick="nightAction_assassinKill(${idx})">
-          <span><span style="color:var(--text3)">${idx+1}.</span> ${esc(p.name)} <span style="color:${clr.txt};font-size:11px">(${ch2?.name})</span></span>
-          <span style="color:var(--red)">💀</span></button>`;
-      });
-      html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--text3);color:var(--text3);font-style:italic" onclick="nightAction_assassinSkip()">🙅 Don't use ability tonight</button>`;
-      break;
-    }
-
-    // BMR: Professor — revive a dead player (once per game)
-    case "professor_pick": {
-      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Choose dead Townsfolk to revive (once per game):</div>`;
-      html += deadPlayerBtns("nightAction_professorRevive(IDX)");
-      html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--red);color:var(--red);font-style:italic" onclick="nightAction_professorFail()">❌ Professor fails (wrong guess or poisoned)</button>`;
-      break;
-    }
-
-    // BMR: Moonchild — if died tonight, choose good player to revenge kill
-    case "moonchild_pick": {
-      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Moonchild died! If they chose a good player today, that player dies:</div>`;
-      gs.players.forEach((p, idx) => {
-        if (!p.alive) return;
-        const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-        const isGood = ch2?.team === "good";
-        html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;display:flex;justify-content:space-between;align-items:center" onclick="nightAction_moonchildKill(${idx})">
-          <span><span style="color:var(--text3)">${idx+1}.</span> ${esc(p.name)} <span style="color:${clr.txt};font-size:11px">(${ch2?.name})</span></span>
-          <span style="color:${isGood?'var(--green)':'var(--red)'}; font-size:10px">${isGood?'GOOD ✓':'EVIL'}</span></button>`;
-      });
-      html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--text3);color:var(--text3)" onclick="">🙅 No revenge (chose evil or nobody)</button>`;
-      break;
-    }
-
-    // ═══════════════════════════════
-    // DEMON VARIANTS
-    // ═══════════════════════════════
-
-    // BMR: Pukka — kill prev victim + poison new
-    case "pukka_pick": {
-      const prevIdx = gs.pukkaVictimIdx;
-      const prev = prevIdx >= 0 ? gs.players[prevIdx] : null;
-
-      if (prev && prev.alive) {
-        html += `<div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:6px">Step 1: Previous victim ${prev.name} dies now:</div>`;
-        html += `<div class="choice-grid" style="margin-bottom:10px">
-          <button class="choice-btn" style="flex:1;color:var(--red);border-color:var(--darkred)" onclick="nightAction_pukkaKillPrev()">💀 Kill ${esc(prev.name)}</button>
-          <button class="choice-btn" style="flex:1;color:var(--green);border-color:#22c55e" onclick="nightAction_pukkaSkipPrev()">🛡️ Survives</button>
-        </div>`;
-      } else {
-        html += `<div style="font-size:12px;color:var(--text3);margin-bottom:6px">${prev ? "Previous victim already dead." : "No previous victim."}</div>`;
-      }
-      html += `<div style="font-size:12px;color:var(--purple);font-weight:600;margin-bottom:6px">Step 2: Pukka poisons a new player:</div>`;
-      html += alivePlayerBtns("nightAction_pukkaPoison(IDX)", [], {icon:"☠️"});
-      break;
-    }
-
-    // Pukka prev only (when exorcised — still resolve prev victim)
-    case "pukka_prev_only": {
-      const prevIdx = gs.pukkaVictimIdx;
-      const prev = prevIdx >= 0 ? gs.players[prevIdx] : null;
-      if (prev && prev.alive) {
-        html += `<div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:6px">Previous victim ${prev.name} still dies (Exorcist doesn't prevent this):</div>`;
-        html += `<div class="choice-grid">
-          <button class="choice-btn" style="flex:1;color:var(--red);border-color:var(--darkred)" onclick="nightAction_pukkaKillPrev()">💀 Kill ${esc(prev.name)}</button>
-          <button class="choice-btn" style="flex:1;color:var(--green);border-color:#22c55e" onclick="nightAction_pukkaSkipPrev()">🛡️ Survives</button>
-        </div>`;
-      } else {
-        html += `<div style="font-size:12px;color:var(--text3)">No previous victim to resolve.</div>`;
-      }
-      break;
-    }
-
-    // BMR: Po — charge up or attack (1 or 3)
-    case "po_pick": {
-      const charged = gs.poCharged;
-      const picks = state.nightStepData.poKills || [];
-
-      if (charged) {
-        html += `<div style="padding:8px;border-radius:6px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.3);color:var(--red);font-size:13px;font-weight:700;margin-bottom:8px">
-          ⚡ CHARGED — Choose 3 players to kill!</div>`;
-        if (picks.length > 0) {
-          html += `<div style="font-size:11px;color:var(--orange);margin-bottom:4px">Selected (${picks.length}/3): ${picks.map(idx=>gs.players[idx].name).join(", ")}</div>`;
-        }
-        html += killPlayerBtns("nightAction_poKill(IDX)", picks);
-        if (picks.length > 0) {
-          html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--text3);color:var(--text3)" onclick="nightAction_poReset()">↩ Reset</button>`;
-        }
-        if (picks.length > 0 && picks.length < 3) {
-          html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--orange);color:var(--orange)" onclick="nightAction_poApply()">⚡ Apply ${picks.length} kill${picks.length>1?"s":""} (skip remaining)</button>`;
-        }
-      } else {
-        html += `<div class="choice-grid" style="margin-bottom:10px">
-          <button class="choice-btn" style="flex:1;color:var(--orange);border-color:var(--orange);font-weight:700" onclick="nightAction_poCharge()">⚡ CHARGE UP<br><span style="font-size:10px;font-weight:400">(3 kills next night)</span></button>
-        </div>`;
-        html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">— OR kill 1 player:</div>`;
-        html += killPlayerBtns("killFromNightWalker(IDX)");
-      }
-      break;
-    }
-
-    // Po loses charge when exorcised
-    case "po_lose_charge": {
-      html += `<button class="char-choice-btn" style="text-align:center;border-color:var(--red);color:var(--red);padding:12px" onclick="state.gs.poCharged=false;state.gs.nightKillDone=true;state.gs.log.push('Night '+state.gs.dayNum+': Po charge lost (Exorcist).');autoSave();render()">
-        ⚡ Clear Po's Charge</button>`;
-      break;
-    }
-
-    // BMR: Shabaloth — kill 2 + optional regurgitate
-    case "shabaloth_pick": {
-      const picks = state.nightStepData.shabKills || [];
-
-      // Regurgitate option (last night's kills)
-      const lastNightDead = gs.players.map((p,i)=>({...p,i})).filter(p => !p.alive);
-      if (lastNightDead.length > 0) {
-        html += `<div style="font-size:12px;color:var(--green);margin-bottom:6px">Optional: Regurgitate (revive) a previous victim first:</div>`;
-        lastNightDead.forEach(p => {
-          const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-          html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:rgba(39,174,96,0.3);color:var(--green)" onclick="nightAction_shabalothRegurgitate(${p.i})">
-            ✨ ${esc(p.name)} (${ch2?.name})</button>`;
-        });
-        html += `<div style="border-top:1px solid rgba(255,255,255,0.06);margin:8px 0"></div>`;
-      }
-
-      html += `<div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:6px">Choose 2 players to kill (${picks.length}/2):</div>`;
-      if (picks.length > 0) {
-        html += `<div style="font-size:11px;color:var(--orange);margin-bottom:4px">Selected: ${picks.map(idx=>gs.players[idx].name).join(", ")}</div>`;
-      }
-      gs.players.forEach((p, idx) => {
-        if (!p.alive || picks.includes(idx)) return;
-        const ch2 = c[p.actual]; const clr = TYPE_CLR[ch2?.type||"townsfolk"];
-        html += `<button class="char-choice-btn" style="margin-bottom:3px;border-color:${clr.bdr}44;display:flex;justify-content:space-between;align-items:center" onclick="nightAction_shabalothKill(${idx})">
-          <span><span style="color:var(--text3)">${idx+1}.</span> ${esc(p.name)} <span style="color:${clr.txt};font-size:11px">(${ch2?.name})</span></span>
-          <span style="color:var(--red)">💀</span></button>`;
-      });
-      if (picks.length > 0) {
-        html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--text3);color:var(--text3)" onclick="nightAction_shabalothReset()">↩ Reset</button>`;
-      }
-      if (picks.length === 1) {
-        html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:var(--orange);color:var(--orange)" onclick="nightAction_shabalothApply()">💀 Apply 1 kill only</button>`;
-      }
-      html += `<button class="char-choice-btn" style="margin-top:4px;text-align:center;border-color:rgba(39,174,96,0.3);color:var(--green);font-style:italic" onclick="markNoDeath()">🛡️ No death (blocked)</button>`;
-      break;
-    }
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function killFromNightWalker(i) {
-  killPlayer(i);
-  // Stay on night tab
+function proceedToNightStep() {
+  stopTimer();
+  state.phase = "night";
+  state.dayNum++;
+  state.activeWakeIdx = 0;
+  state.nightLog = [];
+  state.deathsLastNight = [];
   state.tab = "night";
+
+  autoSave();
   render();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// RENDER NIGHT WALKER
+// FLOW 8: VICTORY SCREEN (`Victory Screen.png`)
 // ══════════════════════════════════════════════════════════════════════════
-function renderNightWalker() {
-  const gs = state.gs;
-  const steps = buildNightSteps();
-  const cur = Math.min(state.nightStep, steps.length);
-  const step = steps[cur];
+function renderVictoryScreen() {
+  const isGood = state.winTeam === "good";
+  const colors = isGood ? TYPE_CLR.townsfolk : TYPE_CLR.demon;
+  const title = isGood ? "TOWNSFOLK WIN" : "DEMONS WIN";
+  const desc = isGood ? "Light has triumphed. The evil has been banished from our village." : "The town has fallen to the darkness. Ravenswood Bluff is no more.";
 
-  // Progress bar
-  const pct = steps.length > 0 ? ((cur / steps.length) * 100) : 0;
-  const progress = `<div style="margin-bottom:20px">
-    <div style="height:6px;border-radius:3px;background:var(--border);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.5)">
-      <div style="width:${pct}%;height:100%;background:linear-gradient(90deg, var(--red)cc, var(--red));transition:width 0.3s"></div>
-    </div>
-  </div>`;
-
-  let stepCard = "";
-  if (step) {
-    const leftBorderColor = step.type === "evil" ? "var(--red)" : step.type === "info" ? "var(--blue)" : "var(--purple)";
-    const titleColor = step.type === "evil" ? "var(--red)" : step.type === "info" ? "var(--blue)" : "var(--teal)";
-
-    stepCard = `<div class="night-step fade-in" style="background:var(--surface);border:1px solid var(--border);border-left:4px solid ${leftBorderColor};box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
-      <h4 style="font-size:20px;color:${titleColor};margin-bottom:12px;font-family:var(--font-serif)">${step.title}</h4>
-      <div style="font-size:13.5px;color:var(--text);padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;font-family:var(--font-serif)">
-        <strong style="color:var(--orange)">PLAYER:</strong> ${step.who}
+  return `
+    <div class="screen fade-in" style="padding-top:32px;text-align:center">
+      <!-- Glow Portal symbol -->
+      <div style="width:160px;height:160px;border-radius:50%;background:rgba(149,27,30,0.05);border:2px dashed ${colors.bdr};box-shadow: 0 0 40px ${colors.bdr}33;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;animation:pulse 2s infinite">
+        <span style="font-size:72px">${isGood ? '😇' : '👹'}</span>
       </div>
-      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:8px">${step.instr}</div>
-      ${step.extra?`<div class="warn warn-orange" style="margin-top:12px;font-weight:600">${step.extra}</div>`:""}
-      ${step.warn?`<div class="warn warn-red" style="margin-top:12px;font-weight:600">${step.warn}</div>`:""}
-      ${step.stHint?`<div style="margin-top:14px;padding:12px;border-radius:8px;background:rgba(41,128,185,0.05);border:1px solid rgba(41,128,185,0.15);font-size:12px;line-height:1.6;color:var(--text2)">
-        <span style="font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--blue);display:block;margin-bottom:6px">🔒 ST EYES ONLY</span>
-        ${step.stHint}
-      </div>`:""}
-      ${step.condition?`<div style="font-size:11px;color:var(--text3);margin-top:10px;font-style:italic">ℹ️ ${step.condition}</div>`:""}
-      ${renderStepShowCards(step)}
-    </div>`;
-  } else {
-    stepCard = `<div style="text-align:center;padding:48px 24px;color:var(--text3)">
-      <div style="font-size:44px;margin-bottom:14px">🌅</div>
-      <div style="font-size:15.5px;font-family:var(--font-serif);color:var(--text2);margin-bottom:6px">Dawn Awaits</div>
-      <div style="font-size:12.5px;color:var(--text3)">Night phase complete. Advance to day when ready.</div>
-    </div>`;
-  }
 
-  // Navigation
-  let nav = `<div style="display:flex;gap:12px;margin-bottom:24px">
-    <button class="btn-outline" style="flex:1;padding:12px;margin:0" ${cur===0?"disabled":""} onclick="state.nightStep=${Math.max(0,cur-1)};render()">← Prev</button>
-    ${cur < steps.length - 1
-      ? `<button class="btn btn-night" style="flex:1;padding:12px;margin:0" onclick="state.nightStep=${cur+1};render()">Next →</button>`
-      : `<button class="btn btn-day" style="flex:1;padding:12px;margin:0" onclick="confirmAction('startDay','Advance to Day?')">☀️ Dawn</button>`
-    }
-  </div>`;
+      <h1 style="font-family:var(--font-serif);font-size:38px;color:${colors.txt};margin-bottom:12px;letter-spacing:1px">${title}</h1>
+      <p style="color:var(--text3);font-size:14px;line-height:1.6;margin-bottom:32px;padding:0 20px">${desc}</p>
 
-  // Step list
-  let stepList = '<div style="font-size:13px;color:var(--text2);font-weight:700;margin-bottom:10px;font-family:var(--font-serif)">All Night Steps:</div>';
-  steps.forEach((s, i) => {
-    const active = i === cur;
-    stepList += `<div onclick="state.nightStep=${i};render()" style="padding:8px 12px;margin-bottom:4px;border-radius:6px;cursor:pointer;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;
-      background:${active?'rgba(255,255,255,0.02)':'transparent'};
-      border-left:3px solid ${active?'var(--red)':'transparent'};
-      color:${i<cur?'var(--text3)':active?'var(--red)':'var(--text2)'};
-      font-weight:${active?'600':'400'};
-      transition:all 0.15s ease">
-      <span>${i<cur?"✓ ":""}${s.title}</span>
-      <span style="color:var(--text3);font-size:11px">${(s.who||"").split("(")[0].trim()}</span>
-    </div>`;
-  });
-
-  return `<div style="padding:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="font-size:22px;color:var(--red);font-family:var(--font-serif)">🌙 ${gs.isFirstNight?"First Night":`Night ${gs.dayNum}`}</h3>
-      <span style="font-size:12px;color:var(--text3);font-weight:600">Step ${cur+1}/${steps.length}</span>
+      <button class="btn btn-primary" onclick="showChronicleEnd()">📖 View Game Summary</button>
+      
+      <!-- Replay / Reset btn bottom-right -->
+      <div style="margin-top:40px;text-align:right">
+        <button class="timer-adj-btn" style="width:48px;height:48px;border-radius:50%;display:inline-flex" onclick="resetEngine()">↻</button>
+      </div>
     </div>
-    ${progress}${stepCard}${nav}${stepList}
-  </div>`;
+  `;
+}
+
+function showChronicleEnd() {
+  state.screen = "game";
+  state.tab = "chronicle";
+  autoSave();
+  render();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// ROLES REFERENCE TAB
+// FLOW 9: GAME CHRONICLE TIMELINE SCREEN (`Game Summary.png`)
 // ══════════════════════════════════════════════════════════════════════════
-function renderRolesRef() {
-  const gs = state.gs;
-  const s = S(); const c = s.C;
+function renderChronicleScreen() {
+  let timeline = "";
 
-  let html = `<div style="padding:16px">
-    <h3 style="font-size:22px;color:${s.color};margin-bottom:12px;font-family:var(--font-serif)">🎭 Role Cards</h3>
-    <div class="card" style="border-color:rgba(41,128,185,0.25);background:rgba(41,128,185,0.06);font-size:12.5px;color:var(--text2);margin-bottom:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
-      💡 Tap a player to view and private-reveal their role card.
-    </div>`;
+  if (state.chronicle.length === 0) {
+    return `<div style="color:var(--text3);text-align:center;padding:32px">The story of Ravenswood Bluff is waiting to unfold...</div>`;
+  }
 
-  gs.players.forEach((p, i) => {
-    const ch = c[p.actual];
-    const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
-    const clr = TYPE_CLR[showCh?.type || ch?.type || "townsfolk"];
-    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 24, "margin-right:4px");
-    html += `<div onclick="state.showingRoleFor=${i};render()" style="padding:12px 14px;margin-bottom:6px;border-radius:8px;border:1px solid ${clr.bdr}33;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);transition:transform 0.15s ease">
-      <span class="seat-num" style="background:${clr.bdr};margin:0">${i+1}</span>
-      ${roleImg}
-      <span style="flex:1;font-weight:600;font-size:13.5px;color:var(--text)">${esc(p.name)}</span>
-      <span style="font-size:16px">${TEMOJI[showCh?.type||"townsfolk"]}</span>
-      <span style="color:var(--text3);font-size:12px;font-weight:600;letter-spacing:0.5px">REVEAL 👁️</span>
-    </div>`;
+  state.chronicle.forEach((c, idx) => {
+    let icon = "🔔";
+    if (c.type === "night") icon = "🌙";
+    if (c.type === "system" && c.title.includes("Tragedy Begins")) icon = "📜";
+    if (c.type === "system" && c.title.includes("Concluded")) icon = "🏆";
+    if (c.type === "day") icon = "☀️";
+
+    timeline += `
+      <div style="position:relative;padding-left:36px;margin-bottom:20px;text-align:left">
+        <!-- Vertical connector line -->
+        ${idx < state.chronicle.length - 1 ? `<div style="position:absolute;left:13px;top:26px;bottom:-20px;width:2px;background:var(--border)"></div>` : ''}
+        
+        <!-- Timeline dot -->
+        <div style="position:absolute;left:0;top:2px;width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;z-index:2">
+          <span style="font-size:12px">${icon}</span>
+        </div>
+
+        <div class="card" style="margin:0;padding:12px 16px;border-radius:10px;border-left:4px solid ${c.badgeColor || 'var(--border)'}">
+          <div style="font-size:10px;text-transform:uppercase;color:var(--text3);letter-spacing:1px;font-weight:700;margin-bottom:4px">
+            ${c.nightNum ? `Night ${c.nightNum}` : c.dayNum ? `Day ${c.dayNum}` : 'SETUP'}
+          </div>
+          <h4 style="font-family:var(--font-serif);color:var(--text);font-size:15px;margin-bottom:4px">${c.title}</h4>
+          <p style="font-size:12px;color:var(--text2);line-height:1.5">${c.details}</p>
+        </div>
+      </div>
+    `;
   });
 
-  // Full character encyclopedia
-  html += `<h4 style="font-size:18px;color:var(--text);margin:28px 0 12px;font-family:var(--font-serif)">All ${s.name} Characters</h4>`;
-  ["townsfolk","outsider","minion","demon"].forEach(type => {
-    const clr = TYPE_CLR[type];
-    html += `<div style="font-weight:700;font-size:12.5px;color:${clr.txt};margin-bottom:8px;margin-top:16px;text-transform:uppercase;letter-spacing:1px;font-family:var(--font-serif)">${TEMOJI[type]} ${type}s</div>`;
-    Object.values(c).filter(ch => ch.type === type).forEach(ch => {
-      const roleImg = renderRoleImage(ch.id, type, 20, "vertical-align:middle;margin-right:6px");
-      html += `<div style="padding:8px 12px;margin-bottom:4px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid var(--border);font-size:12px;line-height:1.5;display:flex;align-items:center;gap:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.01)">
-        ${roleImg}<div><strong style="color:${clr.txt}">${ch.name}:</strong> <span style="color:var(--text2)">${esc(ch.ab)}</span></div>
-      </div>`;
-    });
+  return `
+    <div style="padding:16px">
+      <div style="margin-bottom:20px">
+        <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:4px">Game Chronicle</h3>
+        <p style="color:var(--text3);font-size:13px">The definitive history of Ravenswood Bluff.</p>
+      </div>
+
+      <div style="margin-bottom:28px">${timeline}</div>
+
+      <button class="btn btn-primary" onclick="resetEngine()">🔄 Reset & New Game</button>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PRIMARY GAME SCREEN (Grimoire tab, Day announcements tab, Night wakes)
+// ══════════════════════════════════════════════════════════════════════════
+function renderGameScreen() {
+  let content = "";
+  if (state.tab === "grimoire") {
+    content = renderGrimoireTab();
+  } else if (state.tab === "night") {
+    content = renderNightScreen();
+  } else if (state.tab === "day") {
+    content = renderDayScreen();
+  } else if (state.tab === "timer") {
+    content = renderTimerScreen();
+  } else if (state.tab === "chronicle") {
+    content = renderChronicleScreen();
+  }
+
+  // Beautiful bottom navigation pills matching Script Selection bottom pills
+  return `
+    <div class="screen fade-in" style="padding-bottom:110px">
+      ${content}
+    </div>
+    
+    <!-- Bottom Navigation bar -->
+    <div class="bottom-nav" style="position:fixed;bottom:0;left:0;right:0;background:var(--surface2);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:12px 0;z-index:200;backdrop-filter:blur(10px)">
+      <button style="background:none;border:none;color:${state.tab === 'grimoire' ? 'var(--red)' : 'var(--text3)'};font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer" onclick="setTab('grimoire')">
+        <span style="font-size:18px">👁️</span>
+        Grimoire
+      </button>
+      <button style="background:none;border:none;color:${state.tab === 'night' ? 'var(--red)' : 'var(--text3)'};font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer" onclick="setTab('night')">
+        <span style="font-size:18px">🌙</span>
+        Night Sequence
+      </button>
+      <button style="background:none;border:none;color:${state.tab === 'day' || state.tab === 'timer' ? 'var(--red)' : 'var(--text3)'};font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer" onclick="setTab('day')">
+        <span style="font-size:18px">🏘️</span>
+        Town Square
+      </button>
+      <button style="background:none;border:none;color:${state.tab === 'chronicle' ? 'var(--red)' : 'var(--text3)'};font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer" onclick="setTab('chronicle')">
+        <span style="font-size:18px">📜</span>
+        Chronicle
+      </button>
+    </div>
+  `;
+}
+
+function setTab(t) {
+  state.tab = t;
+  autoSave();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GRIMOIRE TAB (Active view of player roster, alive metrics, character powers)
+// ══════════════════════════════════════════════════════════════════════════
+function renderGrimoireTab() {
+  const s = S();
+  const chars = s.C;
+
+  let playerGrid = "";
+  for (let i = 0; i < state.playerCount; i++) {
+    const rId = state.assignments[i];
+    const c = chars[rId];
+    const colors = TYPE_CLR[c.type];
+    const isAlive = state.alive[i];
+
+    let badgeText = isAlive ? "Alive" : "Dead";
+    let badgeColor = isAlive ? "var(--green)" : "var(--red)";
+
+    playerGrid += `
+      <div class="player-row" style="background:rgba(30,30,30,0.3);margin-bottom:10px;border-radius:10px;border:1px solid ${state.alive[i] ? 'var(--border)' : 'var(--red)33'}">
+        <div class="player-main" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px" onclick="togglePlayerExpand(${i})">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="seat-num" style="background:${colors.bdr};border:none">${i + 1}</div>
+            <div>
+              <span style="font-weight:700;font-size:15px;color:var(--text);${isAlive ? '' : 'text-decoration:line-through;opacity:0.6'}">${esc(state.names[i])}</span>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                <span style="font-size:11px;font-weight:700;color:${colors.txt}">${c.name}</span>
+                <span style="font-size:9px;color:var(--text3);text-transform:uppercase">(${c.type})</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:10px;text-transform:uppercase;font-weight:700;color:${badgeColor};background:${badgeColor}11;border:1px solid ${badgeColor}33;padding:4px 8px;border-radius:4px">
+              ${badgeText}
+            </span>
+            <span style="font-size:12px;color:var(--text3)">${state.expandedPlayer === i ? '▲' : '▼'}</span>
+          </div>
+        </div>
+
+        <!-- Expansion drawer -->
+        ${state.expandedPlayer === i ? `
+          <div class="player-expand" style="border-top:1px solid var(--border);padding:14px;background:rgba(0,0,0,0.2);border-bottom-left-radius:10px;border-bottom-right-radius:10px">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">
+              <strong>Ability:</strong> ${esc(c.ab)}
+            </div>
+            
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <button class="btn-sm" style="flex:1;background:${isAlive ? 'var(--red)15' : 'var(--green)15'};color:${isAlive ? 'var(--red)' : 'var(--green)'};border:1px solid ${isAlive ? 'var(--red)' : 'var(--green)'}44" onclick="togglePlayerAlive(${i})">
+                ${isAlive ? '☠️ Mark Dead' : '💖 Resurrect'}
+              </button>
+              <button class="btn-sm" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text)" onclick="triggerStarpass(${i})">
+                👑 Trigger Starpass
+              </button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  return `
+    <div style="padding:16px">
+      <div style="margin-bottom:20px">
+        <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:4px">Grimoire</h3>
+        <p style="color:var(--text3);font-size:13px">Active overview of player seats, tokens, and alignments.</p>
+      </div>
+
+      <div style="margin-bottom:24px">${playerGrid}</div>
+
+      <button class="btn btn-outline" style="width:100%" onclick="state.confirm={msg:'Declare new game? This deletes session progress.',onYes:'resetEngine'};render()">
+        🔄 New Game / Reset
+      </button>
+    </div>
+  `;
+}
+
+function togglePlayerExpand(idx) {
+  state.expandedPlayer = state.expandedPlayer === idx ? -1 : idx;
+  render();
+}
+
+function togglePlayerAlive(idx) {
+  state.alive[idx] = !state.alive[idx];
+  
+  // Log changes to chronicle
+  state.chronicle.push({
+    type: "day",
+    dayNum: state.dayNum,
+    title: state.alive[idx] ? "Resurrection" : "Death Announcement",
+    details: `Storyteller manually updated <strong>${state.names[idx]}</strong> to be ${state.alive[idx] ? 'ALIVE' : 'DEAD'}.`,
+    badgeColor: state.alive[idx] ? "var(--green)" : "var(--red)"
   });
-  html += '</div>';
-  return html;
+
+  autoSave();
+  render();
 }
 
-function renderLog() {
-  const gs = state.gs;
-  const s = S(); const c = s.C;
+function triggerStarpass(idx) {
+  const s = S();
+  const c = s.C[state.assignments[idx]];
 
-  let html = '<div style="padding:16px">';
-  html += `<h3 style="font-size:22px;color:${s.color};margin-bottom:16px;font-family:var(--font-serif)">📝 Game Log</h3>`;
-
-  if (gs.log.length === 0) {
-    html += '<div style="color:var(--text3);text-align:center;padding:32px;border:1px dashed var(--border);border-radius:8px">No events recorded yet.</div>';
-  } else {
-    gs.log.forEach(entry => {
-      html += `<div style="padding:10px 14px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,0.02);font-size:13px;color:var(--text2);border-left:3px solid var(--red);border-top:1px solid rgba(255,255,255,0.01);border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.01)">${esc(entry)}</div>`;
-    });
+  if (c.type !== "demon") {
+    state.showCard = {
+      title: "Starpass Error",
+      emoji: "❌",
+      text: "Starpass can only be initiated on the active Demon."
+    };
+    render();
+    return;
   }
 
-  // Game state summary
-  const alive = gs.players.filter(p => p.alive);
-  const evilAlive = alive.filter(p => c[p.actual]?.team === "evil");
-  const demon = gs.players.find(p => c[p.actual]?.type === "demon");
+  // Open pop up to select which alive Minion becomes Demon
+  const minions = Object.keys(state.assignments).filter(pIdx => {
+    return state.alive[pIdx] && s.C[state.assignments[pIdx]]?.type === "minion";
+  });
 
-  html += `<div class="card" style="margin-top:24px;padding:16px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:12.5px;color:var(--text2);line-height:2;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
-    <div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:14px;font-family:var(--font-serif);letter-spacing:0.5px">Game State Summary</div>
-    <div>Phase: <span style="font-weight:600;color:var(--text)">${gs.phase==="night"?"🌙 Night":"☀️ Day"} ${gs.dayNum}</span></div>
-    <div>Alive: <span style="font-weight:600;color:var(--green)">${alive.length} / ${gs.players.length}</span></div>
-    <div>Votes needed for execution: <strong style="color:var(--orange)">${Math.ceil(alive.length/2)}</strong></div>
-    <hr style="border-color:var(--border);margin:12px 0">
-    <div>Evil players alive: ${evilAlive.map(p=>`<span style="color:var(--red);font-weight:600">${esc(p.name)} (${c[p.actual]?.name})</span>`).join(", ")||"None"}</div>
-    <div>Demon: ${demon?`${esc(demon.name)} ${demon.alive?"🟢":"🔴"}`:"-"}</div>
-    <div>Poisoned players: ${gs.players.filter(p=>p.poisoned).map(p=>`<span style="color:var(--purple);font-weight:600">${esc(p.name)}</span>`).join(", ")||"None"}</div>`;
-
-  if (state.scriptId === "tb") {
-    const sw = gs.players.find(p => p.actual === "scarletwoman");
-    const mayor = alive.find(p => p.actual === "mayor");
-    if (sw) html += `<div>Scarlet Woman: ${esc(sw.name)} ${sw.alive?"🟢":"🔴"} — ${alive.length>=5?"can become Demon":"needs 5+ alive"}</div>`;
-    if (mayor) html += `<div style="color:var(--orange);font-weight:600">⚠️ Mayor alive — 3 alive + no execution = GOOD WINS</div>`;
-  }
-  if (state.scriptId === "bmr") {
-    html += `<div>Demon type: ${c[gs.demonType]?.name}</div>`;
-    if (gs.courtierTarget) html += `<div>Courtier drunk: ${gs.courtierTarget} (${gs.courtierTimer}N left)</div>`;
-    if (gs.assassinUsed) html += `<div>Assassin: used</div>`;
-    if (gs.professorUsed) html += `<div>Professor: used</div>`;
+  if (minions.length === 0) {
+    state.showCard = {
+      title: "Starpass Blocked",
+      emoji: "🚫",
+      text: "No living Minions are left to pass the demonhood to!"
+    };
+    render();
+    return;
   }
 
-  html += `</div></div>`;
-  return html;
+  let optionsHtml = "";
+  minions.forEach(mIdx => {
+    optionsHtml += `
+      <button class="btn" style="text-align:left;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);margin-bottom:6px"
+        onclick="confirmStarpass(${idx}, ${mIdx})">
+        <strong>${esc(state.names[mIdx])}</strong> (${s.C[state.assignments[mIdx]]?.name})
+      </button>
+    `;
+  });
+
+  state.showCard = {
+    title: "Select New Demon",
+    emoji: "👑",
+    text: `Demon died. Choose which Minion inherits demonhood:<br><br>${optionsHtml}`
+  };
+  render();
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════════════════════════════════════
-// Note: Initialization is handled in the HTML files
+function confirmStarpass(oldDemonIdx, newDemonIdx) {
+  const s = S();
+  const oldDemonName = state.names[oldDemonIdx];
+  const newDemonName = state.names[newDemonIdx];
+  
+  // Set old demon dead, swap role
+  state.alive[oldDemonIdx] = false;
+  
+  // Assign demon token to Minion
+  // Find which demon role they had
+  const demonRole = state.assignments[oldDemonIdx];
+  state.assignments[newDemonIdx] = demonRole;
+
+  state.chronicle.push({
+    type: "system",
+    title: "Demon Starpass",
+    details: `Demon <strong>${oldDemonName}</strong> passed the crown. <strong>${newDemonName}</strong> is now the Demon!`,
+    badgeColor: "var(--red)"
+  });
+
+  state.showCard = null;
+  autoSave();
+  render();
+}

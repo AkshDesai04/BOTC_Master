@@ -1,93 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>🌙 Bad Moon Rising - BOTC Storyteller</title>
-<link rel="stylesheet" href="styles/main.css">
-</head>
-<body>
-
-<div id="app"></div>
-
-<script src="scripts/trouble_brewing.js"></script>
-<script src="scripts/bad_moon_rising.js"></script>
-<script src="scripts/common.js"></script>
 <script>
-// Initialize script after all scripts load
-(function() {
   try {
-    // Verify required objects and functions are loaded
-    if (typeof state === 'undefined' || typeof TB === 'undefined' || typeof BMR === 'undefined' || typeof S === 'undefined') {
-      throw new Error('Required scripts not loaded properly');
-    }
-    
-    // Set script ID and default demon selection
+    let saved = localStorage.getItem("botc_storyteller_v2");
+    let state = saved ? JSON.parse(saved) : {};
     state.scriptId = "bmr";
-    state.selDM = BMR.demonFixed ? [...BMR.defaultDemon] : [];
-    
-    // Check for saved game
-    const saved = loadFromStorage();
-    if (saved && saved._saved) {
-      if (saved.scriptId !== "bmr") {
-        window.location.replace(saved.scriptId === "tb" ? "trouble_brewing.html" : "index.html");
-        return;
-      }
-      // Restore saved state manually (don't use resumeGame as it calls render immediately)
-      Object.assign(state, {
-        screen: saved.screen || "count",
-        playerCount: saved.playerCount || 10,
-        names: saved.names || [],
-        selTF: saved.selTF || [],
-        selOS: saved.selOS || [],
-        selMN: saved.selMN || [],
-        selDM: saved.selDM || [],
-        selTR: saved.selTR || [],
-        travellerData: saved.travellerData || [],
-        godfatherOutsiderMod: saved.godfatherOutsiderMod || 0,
-        drunkAs: saved.drunkAs || "",
-        travellersEnabled: saved.travellersEnabled ?? false,
-        travellersToggle: saved.travellersToggle ?? false,
-        travellers: saved.travellers || [],
-        gs: saved.gs,
-        tab: saved.tab || "grimoire",
-        nightStep: saved.nightStep || 0,
-        nightPhase: saved.nightPhase || "none",
-        undoStack: saved.undoStack || [],
-        rolesShown: saved.rolesShown || [],
-        expandedPlayer: -1,
-        expandedTraveller: saved.expandedTraveller ?? -1,
-        confirm: null,
-        showCard: null,
-        showingRoleFor: -1,
-        timer: saved.timer || null,
-      });
-      state.showResume = false;
-    } else {
-      // Start at count screen if no saved game
-      state.screen = "count";
-    }
-    
-    // Render after everything is set up
-    if (typeof render === 'function') {
-      render();
-    } else {
-      throw new Error('Render function not available');
-    }
-  } catch (error) {
-    console.error("Initialization error:", error);
-    const app = document.getElementById("app");
-    if (app) {
-      app.innerHTML = `<div class="screen" style="padding:32px;text-align:center">
-        <h2 style="color:var(--red);margin-bottom:16px">Error Loading Page</h2>
-        <p style="color:var(--text2);margin-bottom:8px">${error.message}</p>
-        <p style="color:var(--text3);font-size:12px;margin-bottom:16px">Please check the browser console for more details.</p>
-        <button class="btn btn-primary" style="margin-top:16px" onclick="location.reload()">Reload Page</button>
-      </div>`;
-    }
-  }
-})();
+    state.screen = "count";
+    localStorage.setItem("botc_storyteller_v2", JSON.stringify(state));
+  } catch(e) {}
+  window.location.replace("index.html");
 </script>
-
-</body>
+</head>
 </html>

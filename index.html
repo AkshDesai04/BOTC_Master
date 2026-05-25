@@ -3,51 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>🩸 BOTC Storyteller</title>
+<title>🩸 Storyteller's Grimoire</title>
 <link rel="stylesheet" href="styles/main.css">
-<script>
-  try {
-    const raw = localStorage.getItem("botc_storyteller_v2");
-    if (raw) {
-      const saved = JSON.parse(raw);
-      if (saved && saved.scriptId) {
-        if (saved.scriptId === "tb") {
-          window.location.replace("trouble_brewing.html");
-        } else if (saved.scriptId === "bmr") {
-          window.location.replace("bad_moon_rising.html");
-        }
-      }
-    }
-  } catch(e) {}
-</script>
 </head>
 <body>
 
-<div class="screen" style="padding-top:32px">
-  <div style="text-align:center;margin-bottom:32px">
-    <div style="font-size:40px;margin-bottom:8px">🩸</div>
-    <h1 style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px">BOTC Storyteller</h1>
-    <p style="color:var(--text3);font-size:13px">Choose your script</p>
-  </div>
+<div id="app"></div>
 
-  <a href="trouble_brewing.html" style="text-decoration:none;display:block;margin-bottom:12px">
-    <div class="script-card" style="border-color:#e74c3c44">
-      <div style="font-size:36px;margin-bottom:8px">🩸</div>
-      <div style="font-size:18px;font-weight:700;color:#e74c3c;margin-bottom:4px">Trouble Brewing</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:2px">13 Townsfolk • 4 Outsiders • 4 Minions • Imp</div>
-      <div style="font-size:11px;color:var(--text3)">Recommended for new players</div>
-    </div>
-  </a>
-
-  <a href="bad_moon_rising.html" style="text-decoration:none;display:block">
-    <div class="script-card" style="border-color:#f39c1244">
-      <div style="font-size:36px;margin-bottom:8px">🌙</div>
-      <div style="font-size:18px;font-weight:700;color:#f39c12;margin-bottom:4px">Bad Moon Rising</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:2px">13 Townsfolk • 4 Outsiders • 4 Minions • 4 Demons</div>
-      <div style="font-size:11px;color:var(--text3)">More complex — experienced players</div>
-    </div>
-  </a>
-</div>
-
+<!-- Load all BOTC script data -->
+<script src="scripts/trouble_brewing.js"></script>
+<script src="scripts/bad_moon_rising.js"></script>
+<script src="scripts/sects_and_violets.js"></script>
+<script src="scripts/common.js"></script>
+<script>
+// Start game engine
+(function() {
+  try {
+    const saved = loadFromStorage();
+    if (saved && saved._saved) {
+      Object.assign(state, saved);
+      state.showResume = true;
+    } else {
+      state.screen = "select";
+    }
+    render();
+  } catch (error) {
+    console.error("Initialization error:", error);
+    const app = document.getElementById("app");
+    if (app) {
+      app.innerHTML = `<div class="screen" style="padding:32px;text-align:center">
+        <h2 style="color:var(--red);margin-bottom:16px">Error Loading Page</h2>
+        <p style="color:var(--text2);margin-bottom:8px">${error.message}</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="location.reload()">Reload Page</button>
+      </div>`;
+    }
+  }
+})();
+</script>
 </body>
 </html>
