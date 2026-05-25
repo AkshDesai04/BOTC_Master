@@ -94,7 +94,6 @@ let state = {
   nightStepData: {},
   undoStack: [],
   confirm: null,
-  timer: null,
 
   // Overlay state
   showingRoleFor: -1,
@@ -2405,6 +2404,9 @@ function getTimerDefaults(count) {
 }
 
 function initTimer() {
+  if (state.timer && state.timer.intervalId) {
+    clearInterval(state.timer.intervalId);
+  }
   const durs = getTimerDefaults(state.gs?.players?.length || state.playerCount);
   state.timer = {
     phase: 0, running: false, paused: false,
@@ -2422,15 +2424,22 @@ function startTimer() {
 }
 function pauseTimer() {
   state.timer.paused = true; state.timer.running = false;
-  clearInterval(state.timer.intervalId);
+  if (state.timer.intervalId) {
+    clearInterval(state.timer.intervalId);
+    state.timer.intervalId = null;
+  }
   render();
 }
 function stopTimer() {
   state.timer.running = false; state.timer.paused = false;
-  clearInterval(state.timer.intervalId);
+  if (state.timer.intervalId) {
+    clearInterval(state.timer.intervalId);
+    state.timer.intervalId = null;
+  }
 }
 function timerTick() {
   const t = state.timer;
+  if (!t || !t.running) return;
   if (t.seconds > 0) {
     t.seconds--;
     if (t.seconds <= 10 && t.seconds > 0) {
