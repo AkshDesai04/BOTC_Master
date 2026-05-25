@@ -3,10 +3,10 @@
 // TEAM COLORS & EMOJIS (shared)
 // ══════════════════════════════════════════════════════════════════════════
 const TYPE_CLR = {
-  townsfolk: {bg:"rgba(93,173,226,0.08)", bdr:"#2980b9", txt:"#5dade2"},
-  outsider:  {bg:"rgba(72,201,176,0.08)", bdr:"#1abc9c", txt:"#48c9b0"},
-  minion:    {bg:"rgba(155,89,182,0.08)", bdr:"#8e44ad", txt:"#bb8fce"},
-  demon:     {bg:"rgba(231,76,60,0.08)",  bdr:"#c0392b", txt:"#e74c3c"},
+  townsfolk: {bg:"rgba(41,128,185,0.06)", bdr:"#2980b9", txt:"#5dade2"},
+  outsider:  {bg:"rgba(22,160,133,0.06)", bdr:"#1abc9c", txt:"#48c9b0"},
+  minion:    {bg:"rgba(142,68,173,0.06)", bdr:"#8e44ad", txt:"#bb8fce"},
+  demon:     {bg:"rgba(184,29,36,0.06)",  bdr:"#b81d24", txt:"#e74c3c"},
 };
 const TEMOJI = {townsfolk:"🏘️", outsider:"🌿", minion:"🗡️", demon:"👹"};
 
@@ -270,23 +270,23 @@ function renderHeader() {
   let badge = "";
   if (state.gs) {
     const isNight = state.gs.phase === "night";
-    badge = `<div class="phase-badge" style="background:${isNight?"#1a1a3a":"#3a3a1a"};border:1px solid ${isNight?"#4a4a8a":"#8a8a4a"};color:${isNight?"#8888dd":"#cccc44"}">
+    badge = `<div class="phase-badge ${isNight?'warn-red':'warn-orange'}" style="margin:0;font-size:11px;font-weight:700">
       ${isNight?"🌙":"☀️"} ${isNight?"Night":"Day"} ${state.gs.dayNum||1}
     </div>`;
   }
 
   let rightBtns = "";
   if (state.screen === "game" || state.screen === "showroles") {
-    rightBtns = `<button class="btn-outline" style="font-size:11px;padding:4px 8px;color:var(--red);border-color:var(--red)"
+    rightBtns = `<button class="btn-outline" style="font-size:11px;padding:6px 10px;color:var(--red);border-color:rgba(184,29,36,0.3)"
       onclick="state.confirm={msg:'Start a completely new game? Current progress will be lost.',onYes:'newGame'};render()">New Game</button>`;
   }
 
   return `<div class="header">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:20px">${s ? s.emoji : '🩸'}</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:20px;display:inline-flex">${s ? s.emoji : '🩸'}</span>
       <span class="header-title" style="color:${titleColor}">${titleText}</span>
     </div>
-    <div style="display:flex;align-items:center;gap:8px">${rightBtns}${badge}</div>
+    <div style="display:flex;align-items:center;gap:10px">${rightBtns}${badge}</div>
   </div>`;
 }
 
@@ -307,15 +307,15 @@ function renderOverlays() {
     const pCount = saved?.gs?.players?.length || saved?.playerCount || "?";
 
     html += `<div class="overlay" style="z-index:220">
-      <div class="overlay-box" style="border:2px solid var(--blue)">
+      <div class="overlay-box" style="border:2px solid var(--blue);box-shadow: 0 0 16px rgba(41, 128, 185, 0.25)">
         <div style="font-size:36px;margin-bottom:12px">💾</div>
-        <div style="font-size:18px;font-weight:700;color:var(--blue);margin-bottom:8px">Saved Game Found</div>
+        <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px">Saved Game Found</div>
         <div style="font-size:13px;color:var(--text2);margin-bottom:4px">${sEmoji} ${sName}</div>
         <div style="font-size:13px;color:var(--text2);margin-bottom:4px">${phase} • ${pCount} players</div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:16px">Last saved: ${when}</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:18px">Last saved: ${when}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn" style="flex:1;padding:10px;background:#222;color:var(--text2);border:1px solid #333;font-size:13px" onclick="newGame()">New Game</button>
-          <button class="btn btn-blue" style="flex:1;padding:10px;font-size:13px" onclick="resumeGame()">Resume</button>
+          <button class="btn btn-outline" style="flex:1" onclick="newGame()">New Game</button>
+          <button class="btn btn-blue" style="flex:1" onclick="resumeGame()">Resume</button>
         </div>
       </div>
     </div>`;
@@ -326,10 +326,10 @@ function renderOverlays() {
     html += `<div class="confirm-overlay">
       <div class="confirm-box">
         <div style="font-size:36px;margin-bottom:12px">⚠️</div>
-        <div style="font-size:14px;color:var(--text);margin-bottom:16px;line-height:1.5">${state.confirm.msg}</div>
+        <div style="font-size:14px;color:var(--text);margin-bottom:18px;line-height:1.5">${state.confirm.msg}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn" style="flex:1;padding:10px;background:#222;color:var(--text2);border:1px solid #333;font-size:13px" onclick="state.confirm=null;render()">Cancel</button>
-          <button class="btn btn-primary" style="flex:1;padding:10px;font-size:13px" onclick="${state.confirm.onYes}();state.confirm=null;">Confirm</button>
+          <button class="btn btn-outline" style="flex:1" onclick="state.confirm=null;render()">Cancel</button>
+          <button class="btn btn-primary" style="flex:1" onclick="${state.confirm.onYes}();state.confirm=null;">Confirm</button>
         </div>
       </div>
     </div>`;
@@ -339,12 +339,12 @@ function renderOverlays() {
   if (state.showCard) {
     const sc = state.showCard;
     html += `<div class="show-card-overlay" onclick="state.showCard=null;render()">
-      <div class="show-card" style="background:${sc.bg||'#111'};border:3px solid ${sc.borderColor||'#444'}">
+      <div class="show-card" style="background:var(--surface2);border-color:${sc.borderColor||'var(--border)'};box-shadow: 0 0 20px rgba(0,0,0,0.5)">
         <div style="font-size:64px;margin-bottom:16px">${sc.emoji||''}</div>
-        <div style="font-size:${sc.fontSize||'28'}px;font-weight:700;color:${sc.color||'#fff'};margin-bottom:8px">${sc.title||''}</div>
+        <div style="font-size:${sc.fontSize||'28'}px;font-weight:700;color:${sc.color||'var(--text)'};margin-bottom:8px">${sc.title||''}</div>
         ${sc.subtitle?`<div style="font-size:14px;color:var(--text2);margin-bottom:12px">${sc.subtitle}</div>`:''}
-        ${sc.text?`<div style="font-size:15px;color:#ccc;line-height:1.5;padding:12px;background:rgba(0,0,0,0.3);border-radius:10px">${sc.text}</div>`:''}
-        <div style="font-size:11px;color:var(--text3);margin-top:16px">tap anywhere to dismiss</div>
+        ${sc.text?`<div style="font-size:14px;color:var(--text);line-height:1.5;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--border)">${sc.text}</div>`:''}
+        <div style="font-size:11px;color:var(--text3);margin-top:16px;letter-spacing:1px">TAP ANYWHERE TO DISMISS</div>
       </div>
     </div>`;
   }
@@ -358,13 +358,13 @@ function renderOverlays() {
     const clr = TYPE_CLR[showCh?.type || "townsfolk"];
     const roleImg = renderRoleImage(showCh?.id, showCh?.type, 120, "margin-bottom:12px");
     html += `<div class="show-card-overlay" onclick="state.showingRoleFor=-1;render()">
-      <div class="show-card" style="background:linear-gradient(135deg,#0d0d1a,${clr.bg});border:3px solid ${clr.bdr}">
+      <div class="show-card" style="background:var(--surface2);border:2px solid ${clr.bdr};box-shadow: 0 0 24px ${clr.bdr}33">
         ${roleImg || `<div style="font-size:64px;margin-bottom:12px">${TEMOJI[showCh?.type||"townsfolk"]}</div>`}
-        <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">${(showCh?.type||"").toUpperCase()}</div>
-        <div style="font-size:28px;font-weight:700;color:${clr.txt};margin-bottom:16px">${showCh?.name||''}</div>
-        <div style="font-size:14px;color:#ccc;line-height:1.6;padding:12px 16px;background:rgba(0,0,0,0.3);border-radius:10px">${esc(showCh?.ab||'')}</div>
-        ${ch?.team==="evil"?`<div style="margin-top:12px;padding:6px 16px;background:rgba(231,76,60,0.2);border-radius:8px;font-size:13px;color:var(--red);font-weight:700">😈 YOU ARE EVIL</div>`:''}
-        <div style="font-size:11px;color:var(--text3);margin-top:16px">tap anywhere to dismiss</div>
+        <div style="font-size:12px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">${(showCh?.type||"").toUpperCase()}</div>
+        <div style="font-size:28px;font-weight:600;color:${clr.txt};margin-bottom:16px;font-family:var(--font-serif)">${showCh?.name||''}</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--border)">${esc(showCh?.ab||'')}</div>
+        ${ch?.team==="evil"?`<div style="margin-top:14px;padding:8px 16px;background:rgba(184,29,36,0.12);border:1px solid rgba(184,29,36,0.25);border-radius:8px;font-size:13px;color:var(--red);font-weight:700;letter-spacing:1px">😈 YOU ARE EVIL</div>`:''}
+        <div style="font-size:11px;color:var(--text3);margin-top:20px;letter-spacing:1px">TAP ANYWHERE TO DISMISS</div>
       </div>
     </div>`;
   }
@@ -379,20 +379,20 @@ function renderSelectScreen() {
   return `<div class="screen${state._fadeIn?' fade-in':''}" style="padding-top:32px">
     <div style="text-align:center;margin-bottom:32px">
       <div style="font-size:40px;margin-bottom:8px">🩸</div>
-      <h1 style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px">BOTC Storyteller</h1>
-      <p style="color:var(--text3);font-size:13px">Choose your script</p>
+      <h1 style="font-size:24px;font-weight:600;color:var(--text);margin-bottom:4px">Storyteller's Grimoire</h1>
+      <p style="color:var(--text2);font-size:13px">Choose your script to begin</p>
     </div>
 
-    <div class="script-card" style="border-color:${TB.color}44" onclick="selectScript('tb')">
+    <div class="script-card" style="border-color:${TB.color}33" onclick="selectScript('tb')">
       <div style="font-size:36px;margin-bottom:8px">${TB.emoji}</div>
-      <div style="font-size:18px;font-weight:700;color:${TB.color};margin-bottom:4px">${TB.name}</div>
+      <div style="font-size:18px;font-weight:600;color:${TB.color};margin-bottom:4px;font-family:var(--font-serif)">${TB.name}</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:2px">${TB.desc}</div>
       <div style="font-size:11px;color:var(--text3)">${TB.tagline}</div>
     </div>
 
-    <div class="script-card" style="border-color:${BMR.color}44" onclick="selectScript('bmr')">
+    <div class="script-card" style="border-color:${BMR.color}33" onclick="selectScript('bmr')">
       <div style="font-size:36px;margin-bottom:8px">${BMR.emoji}</div>
-      <div style="font-size:18px;font-weight:700;color:${BMR.color};margin-bottom:4px">${BMR.name}</div>
+      <div style="font-size:18px;font-weight:600;color:${BMR.color};margin-bottom:4px;font-family:var(--font-serif)">${BMR.name}</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:2px">${BMR.desc}</div>
       <div style="font-size:11px;color:var(--text3)">${BMR.tagline}</div>
     </div>
@@ -415,34 +415,34 @@ function renderCountScreen() {
   const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
 
   return `<div class="screen${state._fadeIn?' fade-in':''}" style="text-align:center;padding-top:32px">
-    <h2 style="color:${s.color};margin-bottom:4px;font-size:20px">${s.emoji} ${s.name}</h2>
-    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">How many players? (not counting Storyteller)</p>
+    <h2 style="color:${s.color};margin-bottom:8px;font-size:24px;font-family:var(--font-serif)">${s.emoji} ${s.name}</h2>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:24px">How many players? (excluding Storyteller)</p>
 
-    <div style="padding:0 24px;margin-bottom:24px">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-        <span style="font-size:14px;color:var(--text2);min-width:30px">5</span>
+    <div style="padding:0 24px;margin-bottom:28px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span style="font-size:13px;color:var(--text3);min-width:30px;font-weight:600">5</span>
         <input type="range" min="5" max="25" value="${state.playerCount}" 
           style="flex:1;outline:none;cursor:pointer"
           oninput="updatePlayerCount(this.value)"
           onchange="updatePlayerCount(this.value)">
-        <span style="font-size:14px;color:var(--text2);min-width:30px">25</span>
+        <span style="font-size:13px;color:var(--text3);min-width:30px;font-weight:600">25</span>
       </div>
       <input type="number" min="5" max="25" value="${state.playerCount}" 
         inputmode="numeric"
-        style="font-size:24px;font-weight:700;color:${s.color};margin-top:8px;text-align:center;background:transparent;border:none;outline:none;width:100%;padding:4px;border-radius:4px;transition:background 0.2s;cursor:text"
-        onfocus="this.style.background='rgba(255,255,255,0.1)';this.select()"
+        style="font-size:28px;font-weight:700;color:${s.color};margin-top:12px;text-align:center;background:transparent;border:none;outline:none;width:100%;padding:6px;border-radius:8px;transition:background 0.2s;cursor:text"
+        onfocus="this.style.background='rgba(255,255,255,0.05)';this.select()"
         onblur="this.style.background='transparent';updatePlayerCount(this.value)"
         onkeydown="if(event.key==='Enter'){this.blur()}"
         onclick="this.select()">
     </div>
 
-    <div class="card" style="text-align:left;margin-bottom:24px">
-      <div style="font-weight:600;margin-bottom:6px;font-size:13px;color:var(--text2)">Distribution for ${state.playerCount} players:</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:13px">
-        <span style="color:${TYPE_CLR.townsfolk.txt}">🏘️ ${d.t} Townsfolk</span>
-        <span style="color:${TYPE_CLR.outsider.txt}">🌿 ${d.o} Outsiders</span>
-        <span style="color:${TYPE_CLR.minion.txt}">🗡️ ${d.m} Minions</span>
-        <span style="color:${TYPE_CLR.demon.txt}">👹 ${d.d||1} Demon</span>
+    <div class="card" style="text-align:left;margin-bottom:28px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.05)">
+      <div style="font-weight:600;margin-bottom:10px;font-size:13px;color:var(--text2);font-family:var(--font-serif)">Distribution for ${state.playerCount} players:</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px">
+        <span style="color:${TYPE_CLR.townsfolk.txt};background:${TYPE_CLR.townsfolk.bg};border:1px solid ${TYPE_CLR.townsfolk.bdr}33;padding:4px 8px;border-radius:6px">🏘️ ${d.t} Townsfolk</span>
+        <span style="color:${TYPE_CLR.outsider.txt};background:${TYPE_CLR.outsider.bg};border:1px solid ${TYPE_CLR.outsider.bdr}33;padding:4px 8px;border-radius:6px">🌿 ${d.o} Outsiders</span>
+        <span style="color:${TYPE_CLR.minion.txt};background:${TYPE_CLR.minion.bg};border:1px solid ${TYPE_CLR.minion.bdr}33;padding:4px 8px;border-radius:6px">🗡️ ${d.m} Minions</span>
+        <span style="color:${TYPE_CLR.demon.txt};background:${TYPE_CLR.demon.bg};border:1px solid ${TYPE_CLR.demon.bdr}33;padding:4px 8px;border-radius:6px">👹 ${d.d||1} Demon</span>
       </div>
     </div>
 
@@ -481,12 +481,12 @@ function renderNamesScreen() {
 
   let list = "";
   names.forEach((n, i) => {
-    list += `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;margin-bottom:4px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
-      <span style="width:24px;height:24px;border-radius:50%;background:${S().color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i+1}</span>
-      <span style="flex:1;font-weight:500">${esc(n)}</span>
-      <button class="btn-outline" style="padding:2px 6px;font-size:12px" onclick="moveName(${i},-1)" ${i===0?"disabled":""}>↑</button>
-      <button class="btn-outline" style="padding:2px 6px;font-size:12px" onclick="moveName(${i},1)" ${i===names.length-1?"disabled":""}>↓</button>
-      <button class="btn-outline" style="padding:2px 6px;font-size:12px;color:var(--red);border-color:var(--red)" onclick="removeName(${i})">✕</button>
+    list += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:8px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
+      <span style="width:24px;height:24px;border-radius:50%;background:${S().color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i+1}</span>
+      <span style="flex:1;font-weight:600;color:var(--text);font-size:14px">${esc(n)}</span>
+      <button class="btn-outline" style="padding:4px 8px;font-size:12px;margin:0" onclick="moveName(${i},-1)" ${i===0?"disabled":""}>↑</button>
+      <button class="btn-outline" style="padding:4px 8px;font-size:12px;margin:0" onclick="moveName(${i},1)" ${i===names.length-1?"disabled":""}>↓</button>
+      <button class="btn-outline" style="padding:4px 8px;font-size:12px;color:var(--red);border-color:rgba(184,29,36,0.3);margin:0" onclick="removeName(${i})">✕</button>
     </div>`;
   });
 
@@ -495,45 +495,45 @@ function renderNamesScreen() {
   // Save/Load list buttons
   let listBtns = "";
   if (canProceed) {
-    listBtns += `<button class="btn-outline" style="margin-right:8px;font-size:11px" onclick="promptSaveList()">💾 Save List</button>`;
+    listBtns += `<button class="btn-outline" style="margin-right:8px;font-size:11px;font-weight:600;letter-spacing:1px" onclick="promptSaveList()">💾 SAVE LIST</button>`;
   }
   if (lists.length > 0) {
-    listBtns += `<button class="btn-outline" style="font-size:11px" onclick="state.showLoadList=!state.showLoadList;render()">📋 Load List (${lists.length})</button>`;
+    listBtns += `<button class="btn-outline" style="font-size:11px;font-weight:600;letter-spacing:1px" onclick="state.showLoadList=!state.showLoadList;render()">📋 LOAD LIST (${lists.length})</button>`;
   }
 
   // Load list panel
   let loadPanel = "";
   if (state.showLoadList && lists.length > 0) {
-    loadPanel = `<div class="card" style="margin-bottom:12px;border-color:rgba(93,173,226,0.3)">
-      <div style="font-weight:600;font-size:12px;color:var(--blue);margin-bottom:8px">Saved Player Lists</div>`;
+    loadPanel = `<div class="card" style="margin-bottom:16px;border-color:rgba(41,128,185,0.3);background:var(--surface2)">
+      <div style="font-weight:600;font-size:13px;color:var(--blue);margin-bottom:10px;font-family:var(--font-serif)">Saved Player Lists</div>`;
     lists.forEach((l, i) => {
-      loadPanel += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+      loadPanel += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
         <div onclick="loadPlayerList(${i})" style="cursor:pointer;flex:1">
-          <div style="font-weight:600;font-size:13px">${esc(l.name)}</div>
+          <div style="font-weight:600;font-size:13px;color:var(--text)">${esc(l.name)}</div>
           <div style="font-size:11px;color:var(--text3)">${l.count}p • ${l.players.slice(0,3).join(", ")}${l.count>3?"...":""}</div>
         </div>
-        <button class="btn-outline" style="padding:2px 6px;font-size:11px;color:var(--red);border-color:var(--red)" onclick="deletePlayerList(${i})">✕</button>
+        <button class="btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);border-color:rgba(184,29,36,0.3);margin:0" onclick="deletePlayerList(${i})">✕</button>
       </div>`;
     });
     loadPanel += `</div>`;
   }
 
   return `<div class="screen${state._fadeIn?' fade-in':''}">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div>
-        <h2 style="font-size:18px;color:${S().color}">Player Names</h2>
+        <h2 style="font-size:22px;color:${S().color};font-family:var(--font-serif)">Player Names</h2>
         <p style="color:var(--text2);font-size:12px">${names.length}/${count} — clockwise seating order</p>
       </div>
-      <button class="btn-outline" onclick="state.screen='count';render()">← Back</button>
+      <button class="btn-outline" style="margin:0" onclick="state.screen='count';render()">← Back</button>
     </div>
-    <div style="margin-bottom:12px">${listBtns}</div>
+    <div style="margin-bottom:16px">${listBtns}</div>
     ${loadPanel}
-    ${names.length < count ? `<div style="display:flex;gap:8px;margin-bottom:16px">
-      <input class="input" id="nameInput" placeholder="Player name..." value="${esc(state.nameInput)}"
+    ${names.length < count ? `<div style="display:flex;gap:8px;margin-bottom:20px">
+      <input class="input" id="nameInput" placeholder="Enter player name..." value="${esc(state.nameInput)}"
         onkeydown="if(event.key==='Enter')addName()" oninput="state.nameInput=this.value" style="flex:1">
       <button class="btn btn-primary" style="width:auto;padding:10px 18px;background:${S().color}" onclick="addName()">Add</button>
     </div>` : ""}
-    <div style="margin-bottom:16px">${list || '<div style="text-align:center;padding:20px;color:var(--text3)">No players added yet</div>'}</div>
+    <div style="margin-bottom:20px">${list || '<div style="text-align:center;padding:32px;color:var(--text3);border:1px dashed var(--border);border-radius:8px">No players added yet</div>'}</div>
     <button class="btn ${canProceed?'btn-primary':'btn-disabled'}" ${canProceed?"":'disabled'}
       style="${canProceed?'background:'+S().color:''}"
       onclick="goToCharacters()">
@@ -606,16 +606,16 @@ function renderCharScreen() {
     let chips = "";
     chars.forEach(ch => {
       const on = sel.includes(ch.id);
-      const roleImg = renderRoleImage(ch.id, type, 20, "vertical-align:middle;margin-right:4px");
+      const roleImg = renderRoleImage(ch.id, type, 20, "vertical-align:middle;margin-right:6px");
       chips += `<span class="role-chip" onclick="toggleRole('${key}','${ch.id}')"
-        style="border-color:${on?clr.bdr:'#333'};background:${on?clr.bg:'rgba(0,0,0,0.3)'};color:${on?clr.txt:'#666'};font-weight:${on?600:400};display:inline-flex;align-items:center">${roleImg}${ch.name}</span>`;
+        style="border-color:${on?clr.bdr:'rgba(255,255,255,0.05)'};background:${on?clr.bg:'rgba(0,0,0,0.2)'};color:${on?clr.txt:'var(--text3)'};font-weight:${on?600:400};display:inline-flex;align-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">${roleImg}${ch.name}</span>`;
     });
-    return `<div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-weight:600;color:${clr.txt};font-size:14px">${title}</span>
-        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(243,156,18,0.2);color:#f39c12">${sel.length}</span>
+    return `<div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:600;color:${clr.txt};font-size:14.5px;font-family:var(--font-serif)">${title}</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;background:rgba(243,156,18,0.15);color:#f39c12">${sel.length}</span>
       </div>
-      <div>${chips}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">${chips}</div>
     </div>`;
   }
 
@@ -623,12 +623,14 @@ function renderCharScreen() {
   let demonSection = "";
   if (s.demonFixed) {
     const clr = TYPE_CLR.demon;
-    demonSection = `<div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-weight:600;color:${clr.txt};font-size:14px">Demon</span>
-        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(243,156,18,0.2);color:#f39c12">1</span>
+    demonSection = `<div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:600;color:${clr.txt};font-size:14.5px;font-family:var(--font-serif)">Demon</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;background:rgba(243,156,18,0.15);color:#f39c12">1</span>
       </div>
-      <span class="role-chip" style="border-color:${clr.bdr};background:${clr.bg};color:${clr.txt};font-weight:600;cursor:default">Imp</span>
+      <span class="role-chip" style="border-color:${clr.bdr};background:${clr.bg};color:${clr.txt};font-weight:600;cursor:default;display:inline-flex;align-items:center">
+        ${renderRoleImage('imp', 'demon', 20, "vertical-align:middle;margin-right:6px")}Imp
+      </span>
     </div>`;
   } else {
     demonSection = chipSection("Demon", demons, state.selDM, "selDM");
@@ -640,10 +642,10 @@ function renderCharScreen() {
     const availTF = townsfolk.filter(t => !state.selTF.includes(t.id));
     let opts = '<option value="">Select a Townsfolk...</option>';
     availTF.forEach(ch => { opts += `<option value="${ch.id}" ${state.drunkAs===ch.id?"selected":""}>${ch.name}</option>`; });
-    drunkPicker = `<div class="card" style="border-color:rgba(72,201,176,0.3);background:rgba(26,74,58,0.15);margin-bottom:16px">
+    drunkPicker = `<div class="card" style="border-color:rgba(22,160,133,0.3);background:rgba(22,160,133,0.06);margin-bottom:20px">
       <div style="font-weight:600;font-size:13px;color:var(--teal);margin-bottom:8px">🍺 The Drunk believes they are:</div>
       <select class="input" onchange="state.drunkAs=this.value;autoSave();render()">${opts}</select>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">This Townsfolk goes in the bag. The player thinks they ARE this Townsfolk.</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">This Townsfolk goes in the bag. The player thinks they ARE this Townsfolk.</div>
     </div>`;
   }
 
@@ -669,9 +671,9 @@ function renderCharScreen() {
     let travellerChips = "";
     travellers.forEach(tr => {
       const on = state.selTR.includes(tr.id);
-      const travImg = renderRoleImage(tr.id, "traveller", 20, "vertical-align:middle;margin-right:4px");
+      const travImg = renderRoleImage(tr.id, "traveller", 20, "vertical-align:middle;margin-right:6px");
       travellerChips += `<span class="role-chip" onclick="toggleTraveller('${tr.id}')"
-        style="border-color:${on?'#f39c12':'#333'};background:${on?'rgba(243,156,18,0.15)':'rgba(0,0,0,0.3)'};color:${on?'#f39c12':'#666'};font-weight:${on?600:400};display:inline-flex;align-items:center">${travImg}${tr.name}</span>`;
+        style="border-color:${on?'#f39c12':'rgba(255,255,255,0.05)'};background:${on?'rgba(243,156,18,0.12)':'rgba(0,0,0,0.2)'};color:${on?'#f39c12':'var(--text3)'};font-weight:${on?600:400};display:inline-flex;align-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">${travImg}${tr.name}</span>`;
     });
     
     let travellerDetails = "";
@@ -681,12 +683,12 @@ function renderCharScreen() {
       
       const alignmentColor = td.alignment === "good" ? "#5dade2" : "#e74c3c";
       const alignmentText = td.alignment === "good" ? "Good" : "Evil";
-      travellerDetails += `<div class="card" style="border-color:rgba(243,156,18,0.3);background:rgba(243,156,18,0.08);margin-bottom:8px;padding:10px">
-        <div style="font-weight:600;font-size:12px;color:#f39c12;margin-bottom:6px">${travChar.name}</div>
-        <div style="display:flex;gap:8px;align-items:center">
+      travellerDetails += `<div class="card" style="border-color:rgba(243,156,18,0.25);background:rgba(243,156,18,0.06);margin-bottom:10px;padding:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
+        <div style="font-weight:600;font-size:13px;color:#f39c12;margin-bottom:8px">${travChar.name}</div>
+        <div style="display:flex;gap:12px;align-items:center">
           <span style="font-size:11px;color:var(--text2)">Will be randomly assigned from player list</span>
           <button class="btn-outline" 
-            style="width:80px;font-size:12px;padding:6px 12px;margin-left:auto;background:${alignmentColor}22;border-color:${alignmentColor};color:${alignmentColor};font-weight:600"
+            style="width:90px;font-size:12px;padding:6px 12px;margin-left:auto;margin:0;background:${alignmentColor}15;border-color:${alignmentColor};color:${alignmentColor};font-weight:600"
             onclick="state.travellerData[${idx}].alignment=state.travellerData[${idx}].alignment==='good'?'evil':'good';autoSave();render()">
             ${alignmentText}
           </button>
@@ -694,12 +696,12 @@ function renderCharScreen() {
       </div>`;
     });
     
-    travellerSection = `<div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-weight:600;color:#f39c12;font-size:14px">🧳 Travellers (Optional)</span>
-        <span style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(243,156,18,0.2);color:#f39c12">${state.selTR.length}</span>
+    travellerSection = `<div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:600;color:#f39c12;font-size:14.5px;font-family:var(--font-serif)">🧳 Travellers (Optional)</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;background:rgba(243,156,18,0.15);color:#f39c12">${state.selTR.length}</span>
       </div>
-      <div style="margin-bottom:8px">${travellerChips}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">${travellerChips}</div>
       ${travellerDetails}
     </div>`;
   }
@@ -715,18 +717,18 @@ function renderCharScreen() {
   const canProceed = (s.demonFixed || state.selDM.length > 0) && (!hasDrunk || state.drunkAs) && rolesMatchPlayers;
 
   return `<div class="screen${state._fadeIn?' fade-in':''}">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div>
-        <h2 style="font-size:18px;color:${s.color}">Select Characters</h2>
+        <h2 style="font-size:22px;color:${s.color};font-family:var(--font-serif)">Select Characters</h2>
         <p style="color:var(--text2);font-size:12px">${state.playerCount} players</p>
       </div>
-      <button class="btn-outline" onclick="state.screen='names';render()">← Back</button>
+      <button class="btn-outline" style="margin:0" onclick="state.screen='names';render()">← Back</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
-      <button class="btn btn-blue" style="flex:1;font-size:13px" onclick="randomizeRoles()">🎲 Randomize All</button>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:13px;color:var(--text2)" onclick="state.travellersToggle=!state.travellersToggle;autoSave();render()">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px">
+      <button class="btn btn-blue" style="flex:1" onclick="randomizeRoles()">🎲 Randomize All</button>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px;color:var(--text2)" onclick="state.travellersToggle=!state.travellersToggle;autoSave();render()">
         <span>🧳 Travellers</span>
-        <div style="position:relative;width:40px;height:20px;background:${state.travellersToggle?'#f39c12':'#444'};border-radius:10px;transition:background 0.2s;cursor:pointer">
+        <div style="position:relative;width:40px;height:20px;background:${state.travellersToggle?'#f39c12':'var(--border)'};border-radius:10px;transition:background 0.2s;cursor:pointer">
           <div style="position:absolute;top:2px;left:${state.travellersToggle?'22px':'2px'};width:16px;height:16px;background:#fff;border-radius:50%;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
         </div>
       </label>
@@ -737,16 +739,16 @@ function renderCharScreen() {
     ${demonSection}
     ${drunkPicker}
     ${travellerSection}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:12px">
       <div style="flex:1"></div>
-      <div style="font-size:14px;font-weight:600;color:${rolesMatchPlayers?'var(--green)':'var(--red)'};padding:4px 12px;border-radius:6px;background:${rolesMatchPlayers?'rgba(39,174,96,0.15)':'rgba(231,76,60,0.15)'}">
+      <div style="font-size:14px;font-weight:700;color:${rolesMatchPlayers?'var(--green)':'var(--red)'};padding:4px 12px;border-radius:6px;background:${rolesMatchPlayers?'rgba(39,174,96,0.12)':'rgba(184,29,36,0.12)'};border:1px solid ${rolesMatchPlayers?'var(--green)33':'var(--red)33'}">
         ${totalRoles}/${playerCount}
       </div>
     </div>
     <button class="btn ${canProceed?'btn-primary':'btn-disabled'}" ${canProceed?"":'disabled'}
       style="${canProceed?'background:'+s.color:''}"
       onclick="assignAndShowRoles()">
-      ${canProceed?"🎭 Assign Roles & Start":(hasDrunk && !state.drunkAs ? "Select Drunk's false role" : rolesMatchPlayers ? "Select at least one Demon" : `Select ${Math.abs(playerCount - totalRoles)} more role${Math.abs(playerCount - totalRoles) === 1 ? '' : 's'}`)}
+      ${canProceed?"Assign Roles & Start 🎭":(hasDrunk && !state.drunkAs ? "Select Drunk's false role" : rolesMatchPlayers ? "Select at least one Demon" : `Select ${Math.abs(playerCount - totalRoles)} more role${Math.abs(playerCount - totalRoles) === 1 ? '' : 's'}`)}
     </button>
   </div>`;
 }
@@ -1180,8 +1182,8 @@ function renderShowRolesScreen() {
   const s = S(); const c = s.C;
 
   let html = `<div class="screen${state._fadeIn?' fade-in':''}">
-    <h2 style="font-size:18px;color:${s.color};margin-bottom:4px">🎭 Show Role Cards</h2>
-    <p style="color:var(--text2);font-size:12px;margin-bottom:16px">Tap each player to show them their role privately. Drunk sees their believed Townsfolk.</p>`;
+    <h2 style="font-size:22px;color:${s.color};margin-bottom:8px;font-family:var(--font-serif)">🎭 Show Role Cards</h2>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:20px">Tap each player to show them their role privately. The Drunk sees their believed Townsfolk.</p>`;
 
   // TB: Red Herring picker
   if (state.scriptId === "tb" && gs.redHerring !== undefined) {
@@ -1192,9 +1194,9 @@ function renderShowRolesScreen() {
       goodPlayers.forEach(p => {
         rhOpts += `<option value="${p.i}" ${gs.redHerring===p.i?"selected":""}>${p.name} (Seat ${p.i+1} — ${c[p.actual]?.name}${p.actual==="drunk"?" / Drunk":""})</option>`;
       });
-      html += `<div class="card" style="border-color:rgba(231,76,60,0.3);background:rgba(90,26,26,0.15);margin-bottom:16px">
-        <div style="font-weight:600;font-size:13px;color:var(--red);margin-bottom:6px">🎯 Fortune Teller — Red Herring</div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:8px">This good player always registers as the Demon. Persists all game.</div>
+      html += `<div class="card" style="border-color:rgba(184,29,36,0.3);background:rgba(184,29,36,0.06);margin-bottom:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
+        <div style="font-weight:600;font-size:13px;color:var(--red);margin-bottom:6px;font-family:var(--font-serif)">🎯 Fortune Teller — Red Herring</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">This good player always registers as the Demon. Persists all game.</div>
         <select class="input" onchange="setRedHerring(parseInt(this.value))">${rhOpts}</select>
       </div>`;
     }
@@ -1205,10 +1207,10 @@ function renderShowRolesScreen() {
     const grandma = gs.players.find(p => p.actual === "grandmother");
     const grandchild = gs.players[gs.grandchildIdx];
     if (grandma && grandchild) {
-      html += `<div class="card" style="border-color:rgba(93,173,226,0.3);background:rgba(14,37,64,0.3);margin-bottom:16px">
-        <div style="font-weight:600;font-size:13px;color:var(--blue);margin-bottom:6px">👵 Grandmother's Grandchild</div>
-        <div style="font-size:13px;color:var(--text)">${grandchild.name} (Seat ${grandchild.seat}) — ${c[grandchild.actual]?.name}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">Grandmother will be told this during First Night. If Demon kills the grandchild, Grandmother dies too.</div>
+      html += `<div class="card" style="border-color:rgba(41,128,185,0.3);background:rgba(41,128,185,0.06);margin-bottom:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
+        <div style="font-weight:600;font-size:13px;color:var(--blue);margin-bottom:6px;font-family:var(--font-serif)">👵 Grandmother's Grandchild</div>
+        <div style="font-size:13px;color:var(--text);font-weight:600">${grandchild.name} (Seat ${grandchild.seat}) — ${c[grandchild.actual]?.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">Grandmother will be told this during First Night. If Demon kills the grandchild, Grandmother dies too.</div>
       </div>`;
     }
   }
@@ -1219,20 +1221,20 @@ function renderShowRolesScreen() {
     const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
     const clr = TYPE_CLR[showCh?.type || "townsfolk"];
     const shown = state.rolesShown.includes(i);
-    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 28);
-    html += `<div onclick="showRoleTo(${i})" style="padding:12px;margin-bottom:6px;border-radius:10px;border:1px solid ${clr.bdr}44;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:10px;${shown?'opacity:0.6':''}">
-      <span class="seat-num" style="background:${clr.bdr}">${i+1}</span>
+    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 28, "margin-right:4px");
+    html += `<div onclick="showRoleTo(${i})" style="padding:12px 14px;margin-bottom:6px;border-radius:8px;border:1px solid ${clr.bdr}33;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);transition:opacity 0.2s;${shown?'opacity:0.5':''}">
+      <span class="seat-num" style="background:${clr.bdr};margin:0">${i+1}</span>
       ${roleImg}
-      <span style="flex:1;font-weight:600;font-size:14px">${esc(p.name)}</span>
-      <span style="font-size:20px">${TEMOJI[showCh?.type||"townsfolk"]}</span>
-      <span style="color:var(--text3);font-size:14px">${shown?"✓":"👁️"}</span>
+      <span style="flex:1;font-weight:600;font-size:14px;color:var(--text)">${esc(p.name)}</span>
+      <span style="font-size:18px">${TEMOJI[showCh?.type||"townsfolk"]}</span>
+      <span style="color:var(--text3);font-size:13px;font-weight:600">${shown?"✓ DONE":"👁️ REVEAL"}</span>
     </div>`;
   });
 
   const allShown = state.rolesShown.length >= gs.players.length;
-  html += `<div style="margin-top:20px">
-    <button class="btn btn-night" onclick="state.screen='game';autoSave();render()">
-      ${allShown ? "✅" : "⚠️"} Begin Night 1
+  html += `<div style="margin-top:24px">
+    <button class="btn btn-night" style="padding:14px;margin:0" onclick="state.screen='game';autoSave();render()">
+      ${allShown ? "✅ Begin Night 1" : "⚠️ Begin Night 1 (Unrevealed Roles)"}
     </button>
   </div></div>`;
   return html;
@@ -1280,16 +1282,16 @@ function renderGameScreen() {
 
   // Bottom bar
   const hasUndo = state.undoStack.length > 0;
-  const undoBtn = hasUndo ? `<button class="btn" style="width:auto;padding:12px 14px;background:#2a1a1a;color:var(--orange);border:1px solid #4a2a1a;font-size:18px;border-radius:10px" onclick="undoAction()" title="Undo">↩</button>` : "";
+  const undoBtn = hasUndo ? `<button class="btn" style="width:auto;padding:12px 16px;background:var(--surface-bright);color:var(--orange);border:1px solid var(--border);font-size:18px;border-radius:8px;margin:0" onclick="undoAction()" title="Undo">↩</button>` : "";
 
   let bottomBtns = "";
   if (gs.phase === "day") {
     const nextN = gs.dayNum + 1;
-    bottomBtns = `${undoBtn}<button class="btn btn-night" style="flex:1" onclick="confirmAction('startNight','Begin Night ${nextN}? Make sure all day actions are done.')"">🌙 Begin Night ${nextN}</button>`;
+    bottomBtns = `${undoBtn}<button class="btn btn-night" style="flex:1;margin:0" onclick="confirmAction('startNight','Begin Night ${nextN}? Make sure all day actions are done.')">🌙 Begin Night ${nextN}</button>`;
   } else {
     bottomBtns = `${undoBtn}
-      <button class="btn btn-night" style="flex:1" onclick="state.tab='night';render()">🌙 Night Walker</button>
-      <button class="btn btn-day" style="flex:1" onclick="confirmAction('startDay','Advance to Day? Make sure all night steps are done.')">☀️ Dawn</button>`;
+      <button class="btn btn-night" style="flex:1;margin:0" onclick="state.tab='night';render()">🌙 Night Walker</button>
+      <button class="btn btn-day" style="flex:1;margin:0" onclick="confirmAction('startDay','Advance to Day? Make sure all night steps are done.')">☀️ Dawn</button>`;
   }
 
   // Win overlay
@@ -1297,9 +1299,9 @@ function renderGameScreen() {
   if (state.winMsg) {
     const w = state.winMsg;
     winOverlay = `<div class="overlay" onclick="state.winMsg=null;render()">
-      <div class="overlay-box" style="border:2px solid ${w.team==='good'?'#2980b9':'#e74c3c'}">
+      <div class="overlay-box" style="border:2px solid ${w.team==='good'?'#2980b9':'#e74c3c'};background:var(--surface2)">
         <div style="font-size:48px;margin-bottom:12px">${w.team==='good'?'😇':'😈'}</div>
-        <div style="font-size:24px;font-weight:700;color:${w.team==='good'?'#5dade2':'#e74c3c'};margin-bottom:8px">${w.team==='good'?'GOOD':'EVIL'} WINS!</div>
+        <div style="font-size:24px;font-weight:700;color:${w.team==='good'?'#5dade2':'#e74c3c'};margin-bottom:8px;font-family:var(--font-serif)">${w.team==='good'?'GOOD':'EVIL'} WINS!</div>
         <div style="font-size:14px;color:var(--text2);margin-bottom:16px">${w.reason}</div>
         <div style="font-size:12px;color:var(--text3)">Tap to dismiss</div>
       </div>
@@ -1308,12 +1310,12 @@ function renderGameScreen() {
 
   return `<div class="tabs">${tabs}</div>
     <div class="status-bar">
-      <span style="color:var(--green)">👤 ${alive}</span>
-      <span style="color:var(--red)">💀 ${gs.players.length - alive}</span>
-      <span style="color:var(--orange)">🗳️ ${majority}</span>
-      <span style="color:var(--purple)">👻 ${ghostsLeft}</span>
+      <span style="color:var(--green);background:rgba(45,90,39,0.12);border:1px solid rgba(45,90,39,0.25);padding:4px 10px;border-radius:6px;font-weight:700">👤 ALIVE: ${alive}</span>
+      <span style="color:var(--red);background:rgba(184,29,36,0.12);border:1px solid rgba(184,29,36,0.25);padding:4px 10px;border-radius:6px;font-weight:700">💀 DEAD: ${gs.players.length - alive}</span>
+      <span style="color:var(--orange);background:rgba(243,156,18,0.12);border:1px solid rgba(243,156,18,0.25);padding:4px 10px;border-radius:6px;font-weight:700">🗳️ MIN VOTES: ${majority}</span>
+      <span style="color:var(--teal);background:rgba(223,188,217,0.12);border:1px solid rgba(223,188,217,0.25);padding:4px 10px;border-radius:6px;font-weight:700">👻 GHOST VOTES: ${ghostsLeft}</span>
     </div>
-    <div style="padding-bottom:80px">${content}</div>
+    <div style="padding-bottom:100px">${content}</div>
     <div class="bottom-bar">${bottomBtns}</div>
     ${winOverlay}`;
 }
@@ -2272,20 +2274,20 @@ function renderDayPhase() {
   const majority = Math.ceil(alive / 2);
 
   let html = `<div style="padding:16px">
-    <h3 style="font-size:16px;color:var(--orange);margin-bottom:12px">☀️ Day ${gs.dayNum}</h3>
-    <div class="card" style="font-size:13px;margin-bottom:12px">
-      <div>👤 <strong>${alive}</strong> alive — need <strong style="color:var(--orange)">${majority}</strong> votes to execute</div>
-      ${gs.executedToday !== null ? `<div style="margin-top:4px;color:var(--red)">⚖️ Executed today: ${gs.players[gs.executedToday]?.name}</div>` : '<div style="margin-top:4px;color:var(--text3)">No execution yet</div>'}
-      ${gs.exiledToday !== null && state.travellers?.[gs.exiledToday] ? `<div style="margin-top:4px;color:#f39c12">🚫 Exiled today: ${state.travellers[gs.exiledToday]?.name}</div>` : ''}
+    <h3 style="font-size:22px;color:var(--orange);margin-bottom:16px;font-family:var(--font-serif)">☀️ Day ${gs.dayNum}</h3>
+    <div class="card" style="font-size:13px;margin-bottom:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.05)">
+      <div style="font-size:14px;color:var(--text)">👤 <strong>${alive}</strong> alive — need <strong style="color:var(--orange)">${majority}</strong> votes to execute</div>
+      ${gs.executedToday !== null ? `<div style="margin-top:8px;color:var(--red);font-weight:600">⚖️ Executed today: ${gs.players[gs.executedToday]?.name}</div>` : '<div style="margin-top:8px;color:var(--text3)">No execution yet</div>'}
+      ${gs.exiledToday !== null && state.travellers?.[gs.exiledToday] ? `<div style="margin-top:8px;color:#f39c12;font-weight:600">🚫 Exiled today: ${state.travellers[gs.exiledToday]?.name}</div>` : ''}
     </div>`;
 
   // BMR warnings
   if (state.scriptId === "bmr") {
     if (gs.mastermindDay) {
-      html += `<div class="warn warn-red" style="margin-bottom:8px">🎭 MASTERMIND DAY: If any player is executed, their team loses!</div>`;
+      html += `<div class="warn warn-red" style="margin-bottom:12px;font-weight:600">🎭 MASTERMIND DAY: If any player is executed, their team loses!</div>`;
     }
     if (gs.minstrelAllDrunk) {
-      html += `<div class="warn warn-orange" style="margin-bottom:8px">🎵 MINSTREL: Everyone is drunk until dusk!</div>`;
+      html += `<div class="warn warn-orange" style="margin-bottom:12px;font-weight:600">🎵 MINSTREL: Everyone is drunk until dusk!</div>`;
     }
   }
 
@@ -2296,39 +2298,39 @@ function renderDayPhase() {
   if (state.scriptId === "tb") {
     const slayer = gs.players.find(p => p.alive && (p.actual === "slayer" || (p.actual === "drunk" && p.believed === "slayer")));
     if (slayer && !slayer.abilityUsed) {
-      html += `<div class="card" style="border-color:rgba(231,76,60,0.3);margin-top:12px">
+      html += `<div class="card" style="border-color:rgba(184,29,36,0.3);background:var(--surface2);margin-top:16px">
         <div style="font-weight:600;font-size:13px;color:var(--red);margin-bottom:8px">⚔️ Slayer — ${esc(slayer.name)}</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Once per game: publicly choose a player. If they are the Demon, they die.</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">`;
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Once per game: publicly choose a player. If they are the Demon, they die.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">`;
       gs.players.forEach((p, idx) => {
         if (!p.alive || idx === gs.players.indexOf(slayer)) return;
-        html += `<button class="btn-sm" style="background:rgba(231,76,60,0.08);color:var(--text);border:1px solid #333" onclick="slayerUse(${gs.players.indexOf(slayer)},${idx})">${esc(p.name)}</button>`;
+        html += `<button class="btn-sm" style="background:rgba(184,29,36,0.12);color:var(--text);border:1px solid var(--border)" onclick="slayerUse(${gs.players.indexOf(slayer)},${idx})">${esc(p.name)}</button>`;
       });
       html += `</div></div>`;
     }
   }
 
   // Manual win declaration
-  html += `<div style="margin-top:16px;display:flex;gap:8px">
-    <button class="btn-outline" style="flex:1;color:var(--blue);border-color:rgba(93,173,226,0.3);font-size:12px" onclick="declareWin('good')">😇 Good Wins</button>
-    <button class="btn-outline" style="flex:1;color:var(--red);border-color:rgba(231,76,60,0.3);font-size:12px" onclick="declareWin('evil')">😈 Evil Wins</button>
+  html += `<div style="margin-top:20px;display:flex;gap:10px">
+    <button class="btn-outline" style="flex:1;color:var(--blue);border-color:rgba(41,128,185,0.3);font-size:12px;margin:0" onclick="declareWin('good')">😇 Good Wins</button>
+    <button class="btn-outline" style="flex:1;color:var(--red);border-color:rgba(184,29,36,0.3);font-size:12px;margin:0" onclick="declareWin('evil')">😈 Evil Wins</button>
   </div>`;
 
   // Gossip tracker (BMR)
   if (state.scriptId === "bmr" && gs.players.some(p => p.alive && p.actual === "gossip")) {
-    html += `<div class="card" style="border-color:rgba(243,156,18,0.3);margin-top:12px">
-      <div style="font-weight:600;font-size:13px;color:var(--orange);margin-bottom:8px">💬 Gossip Tracker</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input class="input" style="flex:1;font-size:12px" id="gossipInput" placeholder="Gossip statement..."
+    html += `<div class="card" style="border-color:rgba(243,156,18,0.3);background:var(--surface2);margin-top:16px">
+      <div style="font-weight:600;font-size:13px;color:var(--orange);margin-bottom:8px;font-family:var(--font-serif)">💬 Gossip Tracker</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input class="input" style="flex:1;font-size:12px;background:rgba(0,0,0,0.2)" id="gossipInput" placeholder="Gossip statement..."
           onkeydown="if(event.key==='Enter')addGossip()">
-        <button class="btn-sm" style="background:rgba(243,156,18,0.12);color:var(--orange)" onclick="addGossip()">Add</button>
+        <button class="btn-sm" style="background:rgba(243,156,18,0.15);color:var(--orange);font-weight:600" onclick="addGossip()">Add</button>
       </div>`;
     (gs.gossipStatements || []).forEach((g, idx) => {
-      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.04)">
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border)">
         <span style="flex:1;color:${g.resolved?'var(--text3)':'var(--text)'};${g.resolved?'text-decoration:line-through':''}">${esc(g.text)}</span>
         <span style="display:flex;gap:4px">
-          <button class="btn-sm" style="background:rgba(39,174,96,0.12);color:var(--green);font-size:10px" onclick="resolveGossip(${idx},true)">T</button>
-          <button class="btn-sm" style="background:rgba(231,76,60,0.12);color:var(--red);font-size:10px" onclick="resolveGossip(${idx},false)">F</button>
+          <button class="btn-sm" style="background:rgba(39,174,96,0.15);color:var(--green);font-size:10px;font-weight:700" onclick="resolveGossip(${idx},true)">T</button>
+          <button class="btn-sm" style="background:rgba(184,29,36,0.15);color:var(--red);font-size:10px;font-weight:700" onclick="resolveGossip(${idx},false)">F</button>
         </span>
       </div>`;
     });
@@ -3572,66 +3574,68 @@ function renderNightWalker() {
 
   // Progress bar
   const pct = steps.length > 0 ? ((cur / steps.length) * 100) : 0;
-  const progress = `<div style="margin-bottom:16px">
-    <div style="height:4px;border-radius:2px;background:var(--surface3);overflow:hidden">
-      <div style="width:${pct}%;height:100%;background:var(--indigo);transition:width 0.3s"></div>
+  const progress = `<div style="margin-bottom:20px">
+    <div style="height:6px;border-radius:3px;background:var(--border);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.5)">
+      <div style="width:${pct}%;height:100%;background:linear-gradient(90deg, var(--red)cc, var(--red));transition:width 0.3s"></div>
     </div>
   </div>`;
 
   let stepCard = "";
   if (step) {
-    const bgc = step.type==="evil"?"rgba(60,20,20,0.3)":step.type==="info"?"rgba(20,20,60,0.3)":"rgba(20,40,60,0.3)";
-    const bdc = step.type==="evil"?"rgba(231,76,60,0.3)":step.type==="info"?"rgba(136,136,221,0.3)":"rgba(93,173,226,0.3)";
-    const ttc = step.type==="evil"?"var(--red)":step.type==="info"?"var(--indigo)":"var(--blue)";
+    const leftBorderColor = step.type === "evil" ? "var(--red)" : step.type === "info" ? "var(--blue)" : "var(--purple)";
+    const titleColor = step.type === "evil" ? "var(--red)" : step.type === "info" ? "var(--blue)" : "var(--teal)";
 
-    stepCard = `<div class="night-step fade-in" style="background:${bgc};border:1px solid ${bdc}">
-      <h4 style="font-size:18px;color:${ttc};margin-bottom:8px">${step.title}</h4>
-      <div style="font-size:13px;color:#ccc;padding:8px;background:rgba(0,0,0,0.2);border-radius:8px;margin-bottom:8px">
+    stepCard = `<div class="night-step fade-in" style="background:var(--surface);border:1px solid var(--border);border-left:4px solid ${leftBorderColor};box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
+      <h4 style="font-size:20px;color:${titleColor};margin-bottom:12px;font-family:var(--font-serif)">${step.title}</h4>
+      <div style="font-size:13.5px;color:var(--text);padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;font-family:var(--font-serif)">
         <strong style="color:var(--orange)">PLAYER:</strong> ${step.who}
       </div>
-      <div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:4px">${step.instr}</div>
-      ${step.extra?`<div class="warn warn-orange" style="margin-top:8px">${step.extra}</div>`:""}
-      ${step.warn?`<div class="warn warn-red" style="margin-top:8px">${step.warn}</div>`:""}
-      ${step.stHint?`<div style="margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(93,173,226,0.08);border:1px solid rgba(93,173,226,0.2);font-size:12px;line-height:1.6;color:var(--blue)">
-        <span style="font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);display:block;margin-bottom:4px">🔒 ST EYES ONLY</span>
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:8px">${step.instr}</div>
+      ${step.extra?`<div class="warn warn-orange" style="margin-top:12px;font-weight:600">${step.extra}</div>`:""}
+      ${step.warn?`<div class="warn warn-red" style="margin-top:12px;font-weight:600">${step.warn}</div>`:""}
+      ${step.stHint?`<div style="margin-top:14px;padding:12px;border-radius:8px;background:rgba(41,128,185,0.05);border:1px solid rgba(41,128,185,0.15);font-size:12px;line-height:1.6;color:var(--text2)">
+        <span style="font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--blue);display:block;margin-bottom:6px">🔒 ST EYES ONLY</span>
         ${step.stHint}
       </div>`:""}
-      ${step.condition?`<div style="font-size:11px;color:var(--text2);margin-top:6px;font-style:italic">ℹ️ ${step.condition}</div>`:""}
+      ${step.condition?`<div style="font-size:11px;color:var(--text3);margin-top:10px;font-style:italic">ℹ️ ${step.condition}</div>`:""}
       ${renderStepShowCards(step)}
     </div>`;
   } else {
-    stepCard = `<div style="text-align:center;padding:40px 20px;color:var(--text3)">
-      <div style="font-size:40px;margin-bottom:12px">🌅</div>
-      <div style="font-size:14px">Night phase complete. Advance to day when ready.</div>
+    stepCard = `<div style="text-align:center;padding:48px 24px;color:var(--text3)">
+      <div style="font-size:44px;margin-bottom:14px">🌅</div>
+      <div style="font-size:15.5px;font-family:var(--font-serif);color:var(--text2);margin-bottom:6px">Dawn Awaits</div>
+      <div style="font-size:12.5px;color:var(--text3)">Night phase complete. Advance to day when ready.</div>
     </div>`;
   }
 
   // Navigation
-  let nav = `<div style="display:flex;gap:8px;margin-bottom:20px">
-    <button class="btn" style="flex:1;padding:10px;background:${cur===0?'#1a1a1a':'#222'};color:${cur===0?'#444':'#aaa'};border:1px solid #333;font-size:13px" ${cur===0?"disabled":""} onclick="state.nightStep=${Math.max(0,cur-1)};render()">← Prev</button>
+  let nav = `<div style="display:flex;gap:12px;margin-bottom:24px">
+    <button class="btn-outline" style="flex:1;padding:12px;margin:0" ${cur===0?"disabled":""} onclick="state.nightStep=${Math.max(0,cur-1)};render()">← Prev</button>
     ${cur < steps.length - 1
-      ? `<button class="btn btn-night" style="flex:1;padding:10px;font-size:13px" onclick="state.nightStep=${cur+1};render()">Next →</button>`
-      : `<button class="btn btn-day" style="flex:1;padding:10px;font-size:13px" onclick="confirmAction('startDay','Advance to Day?')">☀️ Dawn</button>`
+      ? `<button class="btn btn-night" style="flex:1;padding:12px;margin:0" onclick="state.nightStep=${cur+1};render()">Next →</button>`
+      : `<button class="btn btn-day" style="flex:1;padding:12px;margin:0" onclick="confirmAction('startDay','Advance to Day?')">☀️ Dawn</button>`
     }
   </div>`;
 
   // Step list
-  let stepList = '<div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:6px">All Night Steps:</div>';
+  let stepList = '<div style="font-size:13px;color:var(--text2);font-weight:700;margin-bottom:10px;font-family:var(--font-serif)">All Night Steps:</div>';
   steps.forEach((s, i) => {
     const active = i === cur;
-    stepList += `<div onclick="state.nightStep=${i};render()" style="padding:5px 10px;margin-bottom:2px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;
-      background:${active?'rgba(136,136,221,0.12)':'transparent'};
-      border-left:3px solid ${active?'var(--indigo)':'transparent'};
-      color:${i<cur?'var(--text3)':active?'var(--indigo)':'var(--text2)'}">
+    stepList += `<div onclick="state.nightStep=${i};render()" style="padding:8px 12px;margin-bottom:4px;border-radius:6px;cursor:pointer;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;
+      background:${active?'rgba(255,255,255,0.02)':'transparent'};
+      border-left:3px solid ${active?'var(--red)':'transparent'};
+      color:${i<cur?'var(--text3)':active?'var(--red)':'var(--text2)'};
+      font-weight:${active?'600':'400'};
+      transition:all 0.15s ease">
       <span>${i<cur?"✓ ":""}${s.title}</span>
-      <span style="color:var(--text3)">${(s.who||"").split("(")[0].trim()}</span>
+      <span style="color:var(--text3);font-size:11px">${(s.who||"").split("(")[0].trim()}</span>
     </div>`;
   });
 
   return `<div style="padding:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="font-size:16px;color:var(--indigo)">🌙 ${gs.isFirstNight?"First Night":`Night ${gs.dayNum}`}</h3>
-      <span style="font-size:12px;color:var(--text3)">Step ${cur+1}/${steps.length}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:22px;color:var(--red);font-family:var(--font-serif)">🌙 ${gs.isFirstNight?"First Night":`Night ${gs.dayNum}`}</h3>
+      <span style="font-size:12px;color:var(--text3);font-weight:600">Step ${cur+1}/${steps.length}</span>
     </div>
     ${progress}${stepCard}${nav}${stepList}
   </div>`;
@@ -3645,57 +3649,53 @@ function renderRolesRef() {
   const s = S(); const c = s.C;
 
   let html = `<div style="padding:16px">
-    <h3 style="font-size:16px;color:${s.color};margin-bottom:8px">🎭 Role Cards</h3>
-    <div class="card" style="border-color:rgba(41,128,185,0.2);background:rgba(41,128,185,0.08);font-size:12px;color:var(--blue);margin-bottom:12px">
-      💡 Tap a player to show their role card.
+    <h3 style="font-size:22px;color:${s.color};margin-bottom:12px;font-family:var(--font-serif)">🎭 Role Cards</h3>
+    <div class="card" style="border-color:rgba(41,128,185,0.25);background:rgba(41,128,185,0.06);font-size:12.5px;color:var(--text2);margin-bottom:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
+      💡 Tap a player to view and private-reveal their role card.
     </div>`;
 
   gs.players.forEach((p, i) => {
     const ch = c[p.actual];
     const showCh = (p.actual === "drunk" && p.believed) ? c[p.believed] : ch;
     const clr = TYPE_CLR[showCh?.type || ch?.type || "townsfolk"];
-    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 24);
-    html += `<div onclick="state.showingRoleFor=${i};render()" style="padding:10px 12px;margin-bottom:5px;border-radius:8px;border:1px solid ${clr.bdr}44;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:8px">
-      <span class="seat-num" style="background:${clr.bdr}">${i+1}</span>
+    const roleImg = renderRoleImage(showCh?.id, showCh?.type, 24, "margin-right:4px");
+    html += `<div onclick="state.showingRoleFor=${i};render()" style="padding:12px 14px;margin-bottom:6px;border-radius:8px;border:1px solid ${clr.bdr}33;background:${clr.bg};cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);transition:transform 0.15s ease">
+      <span class="seat-num" style="background:${clr.bdr};margin:0">${i+1}</span>
       ${roleImg}
-      <span style="flex:1;font-weight:600;font-size:13px">${esc(p.name)}</span>
+      <span style="flex:1;font-weight:600;font-size:13.5px;color:var(--text)">${esc(p.name)}</span>
       <span style="font-size:16px">${TEMOJI[showCh?.type||"townsfolk"]}</span>
-      <span style="color:var(--text3);font-size:12px">👁️</span>
+      <span style="color:var(--text3);font-size:12px;font-weight:600;letter-spacing:0.5px">REVEAL 👁️</span>
     </div>`;
   });
 
   // Full character encyclopedia
-  html += `<h4 style="font-size:14px;color:var(--text2);margin:20px 0 10px">All ${s.name} Characters</h4>`;
+  html += `<h4 style="font-size:18px;color:var(--text);margin:28px 0 12px;font-family:var(--font-serif)">All ${s.name} Characters</h4>`;
   ["townsfolk","outsider","minion","demon"].forEach(type => {
     const clr = TYPE_CLR[type];
-    html += `<div style="font-weight:600;font-size:12px;color:${clr.txt};margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">${TEMOJI[type]} ${type}s</div>`;
+    html += `<div style="font-weight:700;font-size:12.5px;color:${clr.txt};margin-bottom:8px;margin-top:16px;text-transform:uppercase;letter-spacing:1px;font-family:var(--font-serif)">${TEMOJI[type]} ${type}s</div>`;
     Object.values(c).filter(ch => ch.type === type).forEach(ch => {
       const roleImg = renderRoleImage(ch.id, type, 20, "vertical-align:middle;margin-right:6px");
-      html += `<div style="padding:6px 10px;margin-bottom:3px;border-radius:6px;background:rgba(255,255,255,0.02);font-size:11px;line-height:1.4;display:flex;align-items:center;gap:6px">
+      html += `<div style="padding:8px 12px;margin-bottom:4px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid var(--border);font-size:12px;line-height:1.5;display:flex;align-items:center;gap:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.01)">
         ${roleImg}<div><strong style="color:${clr.txt}">${ch.name}:</strong> <span style="color:var(--text2)">${esc(ch.ab)}</span></div>
       </div>`;
     });
-    html += '<div style="height:8px"></div>';
   });
   html += '</div>';
   return html;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// LOG TAB
-// ══════════════════════════════════════════════════════════════════════════
 function renderLog() {
   const gs = state.gs;
   const s = S(); const c = s.C;
 
   let html = '<div style="padding:16px">';
-  html += `<h3 style="font-size:16px;color:${s.color};margin-bottom:12px">📝 Game Log</h3>`;
+  html += `<h3 style="font-size:22px;color:${s.color};margin-bottom:16px;font-family:var(--font-serif)">📝 Game Log</h3>`;
 
   if (gs.log.length === 0) {
-    html += '<div style="color:var(--text3);text-align:center;padding:20px">No events yet.</div>';
+    html += '<div style="color:var(--text3);text-align:center;padding:32px;border:1px dashed var(--border);border-radius:8px">No events recorded yet.</div>';
   } else {
     gs.log.forEach(entry => {
-      html += `<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--text2);border-left:3px solid rgba(231,76,60,0.3)">${esc(entry)}</div>`;
+      html += `<div style="padding:10px 14px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,0.02);font-size:13px;color:var(--text2);border-left:3px solid var(--red);border-top:1px solid rgba(255,255,255,0.01);border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.01)">${esc(entry)}</div>`;
     });
   }
 
@@ -3704,21 +3704,21 @@ function renderLog() {
   const evilAlive = alive.filter(p => c[p.actual]?.team === "evil");
   const demon = gs.players.find(p => c[p.actual]?.type === "demon");
 
-  html += `<div style="margin-top:20px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;font-size:12px;color:var(--text3);line-height:2">
-    <div style="font-weight:600;color:var(--text2);margin-bottom:4px">Game State Summary</div>
-    <div>Phase: ${gs.phase==="night"?"🌙 Night":"☀️ Day"} ${gs.dayNum}</div>
-    <div>Alive: ${alive.length} / ${gs.players.length}</div>
-    <div>Votes needed: <strong style="color:var(--orange)">${Math.ceil(alive.length/2)}</strong></div>
-    <hr style="border-color:#222;margin:8px 0">
-    <div>Evil alive: ${evilAlive.map(p=>`<span style="color:var(--red)">${esc(p.name)} (${c[p.actual]?.name})</span>`).join(", ")||"None"}</div>
-    <div>Demon: ${demon?`${esc(demon.name)} ${demon.alive?"✅":"❌"}`:"-"}</div>
-    <div>Poisoned: ${gs.players.filter(p=>p.poisoned).map(p=>`<span style="color:var(--purple)">${esc(p.name)}</span>`).join(", ")||"None"}</div>`;
+  html += `<div class="card" style="margin-top:24px;padding:16px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:12.5px;color:var(--text2);line-height:2;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)">
+    <div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:14px;font-family:var(--font-serif);letter-spacing:0.5px">Game State Summary</div>
+    <div>Phase: <span style="font-weight:600;color:var(--text)">${gs.phase==="night"?"🌙 Night":"☀️ Day"} ${gs.dayNum}</span></div>
+    <div>Alive: <span style="font-weight:600;color:var(--green)">${alive.length} / ${gs.players.length}</span></div>
+    <div>Votes needed for execution: <strong style="color:var(--orange)">${Math.ceil(alive.length/2)}</strong></div>
+    <hr style="border-color:var(--border);margin:12px 0">
+    <div>Evil players alive: ${evilAlive.map(p=>`<span style="color:var(--red);font-weight:600">${esc(p.name)} (${c[p.actual]?.name})</span>`).join(", ")||"None"}</div>
+    <div>Demon: ${demon?`${esc(demon.name)} ${demon.alive?"🟢":"🔴"}`:"-"}</div>
+    <div>Poisoned players: ${gs.players.filter(p=>p.poisoned).map(p=>`<span style="color:var(--purple);font-weight:600">${esc(p.name)}</span>`).join(", ")||"None"}</div>`;
 
   if (state.scriptId === "tb") {
     const sw = gs.players.find(p => p.actual === "scarletwoman");
     const mayor = alive.find(p => p.actual === "mayor");
-    if (sw) html += `<div>Scarlet Woman: ${esc(sw.name)} ${sw.alive?"✅":"❌"} — ${alive.length>=5?"can become Demon":"needs 5+ alive"}</div>`;
-    if (mayor) html += `<div>⚠️ Mayor alive — 3 alive + no execution = GOOD WINS</div>`;
+    if (sw) html += `<div>Scarlet Woman: ${esc(sw.name)} ${sw.alive?"🟢":"🔴"} — ${alive.length>=5?"can become Demon":"needs 5+ alive"}</div>`;
+    if (mayor) html += `<div style="color:var(--orange);font-weight:600">⚠️ Mayor alive — 3 alive + no execution = GOOD WINS</div>`;
   }
   if (state.scriptId === "bmr") {
     html += `<div>Demon type: ${c[gs.demonType]?.name}</div>`;
