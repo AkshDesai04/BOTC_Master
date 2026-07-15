@@ -817,6 +817,17 @@ function setDrunkBelievedRole(playerIndex, roleId) {
   render();
 }
 
+function assignRandomDrunkBelievedRoles() {
+  state.drunkBelievedRoles = {};
+  const drunkPlayerIndexes = getTroubleBrewingDrunkIndexes();
+  const availableBelievedRoles = shuffle(getOutOfPlayTownsfolk());
+  if (availableBelievedRoles.length === 0) return;
+  drunkPlayerIndexes.forEach((playerIndex, index) => {
+    const believedRole = availableBelievedRoles[index % availableBelievedRoles.length];
+    if (believedRole) state.drunkBelievedRoles[playerIndex] = believedRole.id;
+  });
+}
+
 function setRedHerring(playerIndexValue) {
   const playerIndex = Number(playerIndexValue);
   state.redHerringIndex = getEligibleRedHerringIndexes().includes(playerIndex) ? playerIndex : null;
@@ -833,7 +844,7 @@ function renderDrunkBeliefPicker(playerIndex) {
   return `
     <div style="margin-top:8px;padding:10px;border:1px solid var(--orange);background:rgba(243,156,18,0.08);border-radius:7px">
       <label for="drunk-belief-${playerIndex}" style="display:block;font-size:11px;font-weight:700;color:var(--orange);margin-bottom:5px">
-        BELIEVED TOWNSFOLK (required)
+        ASSUMED TOWNSFOLK (required)
       </label>
       <select id="drunk-belief-${playerIndex}" class="input" onchange="setDrunkBelievedRole(${playerIndex}, this.value)">
         <option value="">-- Choose an out-of-play Townsfolk --</option>
@@ -884,7 +895,7 @@ function renderRolesScreen() {
       roleDisplay = `
         <div style="display:flex;align-items:center;gap:8px;background:${colors.bg};border:1px solid ${colors.bdr}44;padding:4px 8px;border-radius:6px">
           ${renderRoleImage(c.id, c.type, 20)}
-          <span style="font-size:12px;font-weight:700;color:${colors.txt}">${believedRole ? `${esc(believedRole.name)} (Drunk)` : esc(c.name)}</span>
+          <span style="font-size:12px;font-weight:700;color:${colors.txt}">${believedRole ? `Drunk (${esc(believedRole.name)})` : esc(c.name)}</span>
           <span style="font-size:9px;text-transform:uppercase;color:var(--text3)">${c.type}</span>
         </div>
       `;
@@ -953,7 +964,7 @@ function renderRolesScreen() {
       </div>
 
       ${renderRedHerringSetup()}
-      ${missingDrunkBeliefs.length > 0 ? `<div class="warn warn-orange" role="alert">Choose an out-of-play believed Townsfolk for every Drunk before finalizing.</div>` : ""}
+      ${missingDrunkBeliefs.length > 0 ? `<div class="warn warn-orange" role="alert">Choose an out-of-play assumed Townsfolk for every Drunk before finalizing.</div>` : ""}
       ${missingRedHerring ? `<div class="warn warn-red" role="alert">Choose the Fortune Teller's Red Herring before finalizing.</div>` : ""}
       <button class="btn btn-primary" ${canFinalize ? "" : 'disabled'} onclick="finalizeGrimoire()">
         📖 Finalize Grimoire
@@ -1074,14 +1085,11 @@ function previousPhysicalRole() {
 
 function randomizeAssignments() {
   const shuffledPool = shuffle(state.rolePool);
-  const previousAssignments = { ...state.assignments };
   for (let i = 0; i < state.playerCount; i++) {
     state.assignments[i] = shuffledPool[i] || "";
   }
-  state.drunkBelievedRoles = state.drunkBelievedRoles ?? {};
-  for (let i = 0; i < state.playerCount; i++) {
-    if (previousAssignments[i] !== state.assignments[i]) delete state.drunkBelievedRoles[i];
-  }
+  normalizeTroubleBrewingSetupState();
+  assignRandomDrunkBelievedRoles();
   normalizeTroubleBrewingSetupState();
   autoSave();
   render();
@@ -1188,7 +1196,7 @@ function finalizeGrimoire() {
       title: "Setup Incomplete",
       emoji: "⚠️",
       text: hasMissingBelief
-        ? "Every Trouble Brewing Drunk needs an out-of-play believed Townsfolk role."
+        ? "Every Trouble Brewing Drunk needs an out-of-play assumed Townsfolk role."
         : "Choose a good player as the Fortune Teller's Red Herring."
     };
     autoSave();
@@ -1484,7 +1492,7 @@ function renderNightScreen() {
     const rc = s.C[n.id] || { name: n.title || n.id, type: "demon" };
     const wakeLabel = n.playerIndex === null
       ? rc.name
-      : `${rc.name}${n.isDrunk ? " (Drunk)" : ""} — ${state.names[n.playerIndex]}`;
+      : `${n.isDrunk ? `Drunk (${rc.name})` : rc.name} — ${state.names[n.playerIndex]}`;
     const done = idx < state.activeWakeIdx;
     const current = idx === state.activeWakeIdx;
 
@@ -1553,7 +1561,7 @@ function renderNightScreen() {
         
         <h3 style="font-family:var(--font-serif);font-size:28px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:10px">
           ${renderRoleImage(charDetails.id, charDetails.type, 32)}
-          ${esc(charDetails.name)}${activeNode.isDrunk ? " (Drunk)" : ""}
+          ${activeNode.isDrunk ? `Drunk (${esc(charDetails.name)})` : esc(charDetails.name)}
         </h3>
         ${activeNode.playerIndex !== null ? `<div style="font-size:13px;color:var(--text2);margin:-6px 0 12px">Wake <strong>${esc(state.names[activeNode.playerIndex])}</strong> (Seat ${activeNode.playerIndex + 1})</div>` : ""}
 
@@ -1602,7 +1610,7 @@ function submitNightTarget(rid, actingPlayerIndex = null, isDrunkAction = false)
     state.chronicle.push({
       type: "night",
       nightNum: state.dayNum,
-      title: `${believedRoleName} (Drunk) — Fake Action`,
+      title: `Drunk (${believedRoleName}) — Fake Action`,
       details: `<strong>${esc(state.names[actingPlayerIndex])}</strong> selected <strong>${esc(pName)}</strong>. Logged for reference only; no effect was resolved.`,
       badgeColor: "var(--orange)"
     });
@@ -2142,7 +2150,7 @@ function renderGrimoireTab() {
             <div>
               <span style="font-weight:700;font-size:15px;color:var(--text);${isAlive ? '' : 'text-decoration:line-through;opacity:0.6'}">${esc(state.names[i])}</span>
               <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-                <span style="font-size:11px;font-weight:700;color:${colors.txt}">${esc(displayRole.name)}${believedRole ? " (Drunk)" : ""}</span>
+                <span style="font-size:11px;font-weight:700;color:${colors.txt}">${believedRole ? `Drunk (${esc(believedRole.name)})` : esc(displayRole.name)}</span>
                 <span style="font-size:9px;color:var(--text3);text-transform:uppercase">(${esc(roleCategoryLabel(displayRole))})</span>
               </div>
             </div>
