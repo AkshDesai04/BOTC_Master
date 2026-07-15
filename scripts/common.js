@@ -390,12 +390,15 @@ function renderOverlays() {
 
   // Dismissible details card popup
   if (state.showCard) {
+    const cardBody = state.showCard.html
+      ? state.showCard.html
+      : esc(state.showCard.text ?? "").replace(/\n/g, "<br>");
     html += `
       <div class="overlay" style="z-index:300" onclick="state.showCard=null;render()">
         <div class="show-card" style="background:var(--surface2);border:1px solid var(--border);padding:24px;border-radius:12px;width:90%;max-width:380px;text-align:center;box-shadow: 0 8px 32px rgba(0,0,0,0.6)" onclick="event.stopPropagation()">
           <div style="font-size:48px;margin-bottom:12px">${state.showCard.emoji || 'ℹ️'}</div>
-          <h3 style="font-family:var(--font-serif);color:var(--text);margin-bottom:8px;font-size:22px">${state.showCard.title}</h3>
-          <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px">${state.showCard.text.replace(/\n/g, '<br>')}</p>
+          <h3 style="font-family:var(--font-serif);color:var(--text);margin-bottom:8px;font-size:22px">${esc(state.showCard.title ?? "")}</h3>
+          <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px">${cardBody}</div>
           <button class="btn btn-primary" style="padding:10px" onclick="state.showCard=null;render()">Dismiss</button>
         </div>
       </div>
@@ -966,7 +969,7 @@ function editPlayerRole(playerIdx) {
   state.showCard = {
     title: `Assign Role: ${esc(state.names[playerIdx])}`,
     emoji: "🃏",
-    text: `Select a character token to place in ${esc(state.names[playerIdx])}'s grimoire slot:<br><br><div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column">${optionsHtml}</div>`
+    html: `Select a character token to place in ${esc(state.names[playerIdx])}'s grimoire slot:<br><br><div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column">${optionsHtml}</div>`
   };
   render();
 }
@@ -1010,7 +1013,7 @@ function openPoolEditor() {
   state.showCard = {
     title: "Customize Role Pool",
     emoji: "⚙️",
-    text: `Toggle roles that should be present in tonight's distribution:<br><br><div style="max-height:250px;overflow-y:auto;text-align:left">${listHtml}</div>`
+    html: `Toggle roles that should be present in tonight's distribution:<br><br><div style="max-height:250px;overflow-y:auto;text-align:left">${listHtml}</div>`
   };
   render();
 }
@@ -1950,7 +1953,7 @@ function triggerStarpass(idx) {
   state.showCard = {
     title: "Select New Demon",
     emoji: "👑",
-    text: `Demon died. Choose which Minion inherits demonhood:<br><br>${optionsHtml}`
+    html: `Demon died. Choose which Minion inherits demonhood:<br><br>${optionsHtml}`
   };
   render();
 }
