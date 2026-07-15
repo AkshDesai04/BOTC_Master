@@ -2164,6 +2164,25 @@ function renderGrimoireTab() {
     let badgeText = isAlive ? "Alive" : "Dead";
     let badgeColor = isAlive ? "var(--green)" : "var(--red)";
 
+    let voteIndicator = "";
+    if (isUltimateWerewolf()) {
+      if ((state.votes[i] ?? 1) > 0) {
+        voteIndicator = `<span style="font-size:12px;color:var(--text2);margin-right:4px" title="Votes: ${state.votes[i] ?? 1}">🗳️ ${state.votes[i] ?? 1}</span>`;
+      }
+    } else {
+      if (isAlive) {
+        if ((state.votes[i] ?? 1) !== 1) {
+          voteIndicator = `<span style="font-size:12px;color:var(--text2);margin-right:4px" title="Votes: ${state.votes[i] ?? 1}">🗳️ ${state.votes[i] ?? 1}</span>`;
+        }
+      } else {
+        if (state.ghostVotes[i]) {
+          voteIndicator = `<span style="font-size:12px;opacity:0.35;margin-right:4px" title="Ghost vote spent">👻❌</span>`;
+        } else {
+          voteIndicator = `<span style="font-size:12px;margin-right:4px" title="Ghost vote available">👻</span>`;
+        }
+      }
+    }
+
     playerGrid += `
       <div class="player-row" style="background:rgba(30,30,30,0.3);margin-bottom:10px;border-radius:10px;border:1px solid ${state.alive[i] ? 'var(--border)' : 'var(--red)33'}">
         <div class="player-main" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px" onclick="togglePlayerExpand(${i})">
@@ -2179,6 +2198,7 @@ function renderGrimoireTab() {
           </div>
 
           <div style="display:flex;align-items:center;gap:12px">
+            ${voteIndicator}
             <span style="font-size:10px;text-transform:uppercase;font-weight:700;color:${badgeColor};background:${badgeColor}11;border:1px solid ${badgeColor}33;padding:4px 8px;border-radius:4px">
               ${badgeText}
             </span>
@@ -2208,6 +2228,25 @@ function renderGrimoireTab() {
               ${isUltimateWerewolf() ? "" : `<button class="btn-sm" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text)" onclick="triggerStarpass(${i})">
                 👑 Trigger Starpass
               </button>`}
+            </div>
+
+            <!-- Vote & Ghost Vote Controls -->
+            <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text2)">
+                <span>Vote Tokens: <strong>${state.votes[i] ?? 1}</strong></span>
+                <div style="display:flex;gap:4px">
+                  <button class="timer-adj-btn" style="width:24px;height:24px;font-size:12px;padding:0;line-height:22px" onclick="adjustPlayerVotes(${i}, -1);event.stopPropagation()">-</button>
+                  <button class="timer-adj-btn" style="width:24px;height:24px;font-size:12px;padding:0;line-height:22px" onclick="adjustPlayerVotes(${i}, 1);event.stopPropagation()">+</button>
+                </div>
+              </div>
+              ${!isAlive && !isUltimateWerewolf() ? `
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text2)">
+                  <span>Ghost Vote: <strong>${state.ghostVotes[i] ? "Used ❌" : "Available 👻"}</strong></span>
+                  <button class="btn-sm" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:2px 8px;font-size:11px" onclick="toggleGhostVote(${i});event.stopPropagation()">
+                    ${state.ghostVotes[i] ? "Restore" : "Spend"}
+                  </button>
+                </div>
+              ` : ""}
             </div>
           </div>
         ` : ''}
@@ -2327,6 +2366,23 @@ function confirmStarpass(oldDemonIdx, newDemonIdx) {
   });
 
   state.showCard = null;
+  autoSave();
+  render();
+}
+
+function adjustPlayerVotes(idx, delta) {
+  state.votes[idx] = Math.max(0, (state.votes[idx] ?? 1) + delta);
+  autoSave();
+  render();
+}
+
+function toggleGhostVote(idx) {
+  state.ghostVotes[idx] = !state.ghostVotes[idx];
+  if (state.ghostVotes[idx]) {
+    state.votes[idx] = 0;
+  } else {
+    state.votes[idx] = 1;
+  }
   autoSave();
   render();
 }
