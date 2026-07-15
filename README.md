@@ -55,7 +55,7 @@ A moderator-led physical-card mode for 5–75 recorded seats. The app does not c
 - Allow the Storyteller to customize the pool and manually change assignments.
 - Record Ultimate Werewolf physical cards by seat and enforce each card's inventory quantity.
 - Present Blood on the Clocktower roles in a private hand-off reveal flow.
-- For Trouble Brewing's Drunk, require an out-of-play believed Townsfolk, reveal only that role, label it for the Storyteller as `(Drunk)`, and insert its fake wake at the believed role's normal night position.
+- For Trouble Brewing's Drunk, require an out-of-play assumed Townsfolk, reveal only that assumed role during hand-off, label Storyteller views as `Drunk (Assumed Role)`, and insert its fake wake at the assumed role's normal night position.
 - Maintain a Trouble Brewing Fortune Teller Red Herring when either a real Fortune Teller or a Drunk believing they are the Fortune Teller is present.
 - Show sober truth references for a Drunk believing they are an information role, while prominently instructing the Storyteller to give incorrect information.
 - Filter the configured first-night or other-night order to roles recorded in play.
@@ -89,7 +89,7 @@ Night prompts and role text are references. Pressing **Submit** records one sele
 3. Enter players clockwise. Blank names become `Player 1`, `Player 2`, and so on.
 4. Prepare roles.
    - **Blood on the Clocktower:** review the generated role pool, customize it if needed, then assign or randomize all seats.
-   - **Trouble Brewing Drunk:** after the Drunk is assigned to a seat, choose the out-of-play Townsfolk they believe they are. If Fortune Teller is real or believed, also choose a good Red Herring. Both choices are required before finalization.
+   - **Trouble Brewing Drunk:** after manually assigning the Drunk to a seat, choose the out-of-play Townsfolk they believe they are. **Randomize All** makes this choice automatically. If Fortune Teller is real or assumed, also choose a good Red Herring. Required choices must be complete before finalization.
    - **Ultimate Werewolf:** search for and record the card actually dealt to each seat. Cards at their inventory limit become unavailable.
 5. Finalize.
    - **Blood on the Clocktower:** hand the device to each player in turn for their private role reveal, then begin Night 1.
