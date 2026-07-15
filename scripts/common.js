@@ -1622,7 +1622,7 @@ function submitNightTarget(rid, actingPlayerIndex = null, isDrunkAction = false)
 
   // Custom logical actions based on scripts
   if (isDrunkAction) {
-    const believedRoleName = TB.C[rid]?.name ?? rid;
+    const believedRoleName = S().C[rid]?.name ?? rid;
     state.chronicle.push({
       type: "night",
       nightNum: state.dayNum,
@@ -1639,15 +1639,21 @@ function submitNightTarget(rid, actingPlayerIndex = null, isDrunkAction = false)
       details: `The Poisoner poisoned <strong>${pName}</strong>.`,
       badgeColor: TYPE_CLR.minion.bdr
     });
-  } else if (rid === "imp" || rid === "fanggu" || rid === "nodashi" || rid === "vortox" || rid === "vigormortis") {
-    // Demon kill targets
+  } else if (
+    rid === "imp" || rid === "fanggu" || rid === "nodashi" || rid === "vortox" || rid === "vigormortis" ||
+    rid === "zombuul" || rid === "shabaloth" || rid === "po" || rid === "pukka" ||
+    rid === "werewolf" || rid === "vampire" || rid === "chupacabra"
+  ) {
+    // Demon/Killer strike targets
     state.deathsLastNight.push(pIdx);
     state.chronicle.push({
       type: "night",
       nightNum: state.dayNum,
-      title: "Demon Strike",
-      details: `The Demon targeted <strong>${pName}</strong>.`,
-      badgeColor: TYPE_CLR.demon.bdr
+      title: isUltimateWerewolf() ? `${S().C[rid]?.name || rid} Strike` : "Demon Strike",
+      details: isUltimateWerewolf()
+        ? `The ${S().C[rid]?.name || rid} targeted <strong>${pName}</strong>.`
+        : `The Demon targeted <strong>${pName}</strong>.`,
+      badgeColor: TYPE_CLR[S().C[rid]?.type]?.bdr || TYPE_CLR.demon.bdr
     });
   } else {
     // General action log
