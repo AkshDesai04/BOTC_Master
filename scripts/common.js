@@ -1357,7 +1357,15 @@ function getActiveWakeList(nightOrder) {
       const playerIndex = Number(playerIndexValue);
       if (isUltimateWerewolf()) {
         if (actualRoleId === nightNode.id && state.alive[playerIndex] !== false) {
-          activeWakeList.push({ ...nightNode, playerIndex, isDrunk: false });
+          const char = S().C[actualRoleId];
+          const isGroupRole = char && char.quantity > 1;
+          if (isGroupRole) {
+            if (!activeWakeList.some(n => n.id === nightNode.id)) {
+              activeWakeList.push({ ...nightNode, playerIndex: null, isDrunk: false });
+            }
+          } else {
+            activeWakeList.push({ ...nightNode, playerIndex, isDrunk: false });
+          }
         }
         return;
       }
