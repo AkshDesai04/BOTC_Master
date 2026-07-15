@@ -55,6 +55,9 @@ A moderator-led physical-card mode for 5–75 recorded seats. The app does not c
 - Allow the Storyteller to customize the pool and manually change assignments.
 - Record Ultimate Werewolf physical cards by seat and enforce each card's inventory quantity.
 - Present Blood on the Clocktower roles in a private hand-off reveal flow.
+- For Trouble Brewing's Drunk, require an out-of-play believed Townsfolk, reveal only that role, label it for the Storyteller as `(Drunk)`, and insert its fake wake at the believed role's normal night position.
+- Maintain a Trouble Brewing Fortune Teller Red Herring when either a real Fortune Teller or a Drunk believing they are the Fortune Teller is present.
+- Show sober truth references for a Drunk believing they are an information role, while prominently instructing the Storyteller to give incorrect information.
 - Filter the configured first-night or other-night order to roles recorded in play.
 - Offer one-target night-action logging and add entries to a local chronicle.
 - Automatically mark a target for death only when a submitted target belongs to the Poisoner or one of the explicitly handled Demons: Imp, Fang Gu, Vigormortis, No-Dashi, or Vortox. Poisoner selection is logged but does not alter later information.
@@ -70,9 +73,8 @@ A moderator-led physical-card mode for 5–75 recorded seats. The app does not c
 
 - Validate that a selected role pool is a legal or balanced setup.
 - Apply setup modifiers such as Baron, Godfather, Fang Gu, or Vigormortis automatically.
-- Implement the Drunk's believed Townsfolk role despite the script's `hasDrunk` metadata.
 - Resolve poisoning, drunkenness, protection, registration, madness, nominations, executions, voting powers, resurrection, character changes, alignment changes, or most death prevention/causes.
-- Determine whether a target is legal for a role, collect two-player/character choices, or calculate information to show.
+- Determine whether a target is legal for most roles, collect two-player/character choices, or calculate information outside the specific Trouble Brewing Drunk references described above.
 - Automatically determine victory conditions.
 - Replace the official rulebook, tokens, night sheets, or a knowledgeable Storyteller/moderator.
 
@@ -87,6 +89,7 @@ Night prompts and role text are references. Pressing **Submit** records one sele
 3. Enter players clockwise. Blank names become `Player 1`, `Player 2`, and so on.
 4. Prepare roles.
    - **Blood on the Clocktower:** review the generated role pool, customize it if needed, then assign or randomize all seats.
+   - **Trouble Brewing Drunk:** after the Drunk is assigned to a seat, choose the out-of-play Townsfolk they believe they are. If Fortune Teller is real or believed, also choose a good Red Herring. Both choices are required before finalization.
    - **Ultimate Werewolf:** search for and record the card actually dealt to each seat. Cards at their inventory limit become unavailable.
 5. Finalize.
    - **Blood on the Clocktower:** hand the device to each player in turn for their private role reveal, then begin Night 1.
@@ -428,6 +431,7 @@ White Wolf and Lone Wolf are grouped with the Werewolf team above but are also a
 
 - Session state is serialized as JSON in the current browser's `localStorage` under `botc_storyteller_v2`.
 - Saved data includes player names, script, distribution, assignments, alive/dead status, night targets, chronicle entries, timer values, and declared winners.
+- Trouble Brewing saves also include each Drunk seat's believed Townsfolk and the Fortune Teller Red Herring. Older saves without these fields load with safe empty defaults; an active legacy Drunk game returns to role setup so the Storyteller can make the required secret choice.
 - Reloading the main page offers to resume a saved session.
 - The timer is paused after a resumed reload for safety.
 - **Reset Session** and **Reset & New Game** remove the saved session.
@@ -535,6 +539,8 @@ Current Chromium, Firefox, and Safari-family browsers are reasonable targets bas
 
 - The app is a reference and tracker, not a rules adjudicator.
 - Role prompts can be incomplete for abilities requiring multiple players, character choices, arbitrary information, secret state, or daytime actions.
+- A Trouble Brewing Drunk's believed action is only logged as fake/no-effect. The Storyteller must manually ignore passive/day abilities and deliberately provide misinformation. Fortune Teller still has a one-target logger rather than a two-target chooser.
+- Drunk truth references calculate Chef pairs and Empath neighbours from current seating/alive state and list relevant recorded roles for Washerwoman, Librarian, and Investigator. They show Demon/Red Herring context for Fortune Teller and true target roles in the target menu for Ravenkeeper. Executions are not tracked, so Undertaker truth must be checked manually.
 - Only a small hard-coded subset of submitted night targets receives special death/log handling.
 - Night order entries beginning with `_` are always displayed as reminders; some BMR entries use non-character IDs without that prefix and may be omitted because they are not seat assignments.
 - Blood on the Clocktower role assignment can be manually changed outside the generated pool, and the app does not prevent duplicate unique roles.

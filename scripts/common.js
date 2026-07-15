@@ -107,6 +107,8 @@ let state = {
   dist: { t: 0, o: 0, m: 0, d: 0 }, // Modified distribution
   rolePool: [],           // List of role IDs selected in the game pool
   assignments: {},        // playerIndex -> roleId
+  drunkBelievedRoles: {}, // TB Drunk playerIndex -> out-of-play Townsfolk roleId
+  redHerringIndex: null,  // TB Fortune Teller good player registration
   roleEntryIndex: 0,      // moderator's current physical-card entry seat
   revealIndex: 0,         // Index of player during hand-off role reveal
 
@@ -149,6 +151,8 @@ function autoSave() {
       names: state.names,
       rolePool: state.rolePool,
       assignments: state.assignments,
+      drunkBelievedRoles: state.drunkBelievedRoles,
+      redHerringIndex: state.redHerringIndex,
       roleEntryIndex: state.roleEntryIndex,
       revealIndex: state.revealIndex,
       dayNum: state.dayNum,
@@ -193,6 +197,8 @@ function resetEngine() {
     dist: { t: 0, o: 0, m: 0, d: 0 },
     rolePool: [],
     assignments: {},
+    drunkBelievedRoles: {},
+    redHerringIndex: null,
     roleEntryIndex: 0,
     revealIndex: 0,
     dayNum: 1,
@@ -224,6 +230,8 @@ function resumeGame() {
   const saved = loadFromStorage();
   if (saved) {
     Object.assign(state, saved);
+    state.drunkBelievedRoles = saved.drunkBelievedRoles ?? {};
+    state.redHerringIndex = saved.redHerringIndex ?? null;
     if (!saved.dist) {
       const s = S();
       const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
@@ -232,6 +240,16 @@ function resumeGame() {
     state.showResume = false;
     if (state.timerRunning) {
       state.timerRunning = false; // pause on reload for safety
+    }
+    const legacyDrunkNeedsSetup = state.scriptId === "tb"
+      && getTroubleBrewingDrunkIndexes().some(playerIndex => !getDrunkBelievedRoleId(playerIndex));
+    if (legacyDrunkNeedsSetup && ["reveal", "game", "victory"].includes(state.screen)) {
+      state.screen = "roles";
+      state.showCard = {
+        title: "Drunk Setup Required",
+        emoji: "🍺",
+        text: "This saved game predates believed-role tracking. Choose an out-of-play Townsfolk for every Drunk before continuing. Re-finalizing restarts the reveal and active-night setup."
+      };
     }
     render();
   }
@@ -721,6 +739,8 @@ function proceedToRoles() {
   
   // Empty assignments
   state.assignments = {};
+  state.drunkBelievedRoles = {};
+  state.redHerringIndex = null;
   for (let i = 0; i < state.playerCount; i++) {
     state.assignments[i] = "";
   }
@@ -733,11 +753,121 @@ function proceedToRoles() {
 // ══════════════════════════════════════════════════════════════════════════
 // FLOW 3: ROLE POOL & ASSIGNMENT SCREEN (`Role Assignment.png`)
 // ══════════════════════════════════════════════════════════════════════════
+function isTroubleBrewingDrunk(playerIndex) {
+  return state.scriptId === "tb" && state.assignments[playerIndex] === "drunk";
+}
+
+function getDrunkBelievedRoleId(playerIndex) {
+  if (!isTroubleBrewingDrunk(playerIndex)) return "";
+  return state.drunkBelievedRoles?.[playerIndex] ?? "";
+}
+
+function getOutOfPlayTownsfolk() {
+  if (state.scriptId !== "tb") return [];
+  const assignedRoles = new Set(Object.values(state.assignments));
+  return Object.values(TB.C).filter(role => role.type === "townsfolk" && !assignedRoles.has(role.id));
+}
+
+function getTroubleBrewingDrunkIndexes() {
+  if (state.scriptId !== "tb") return [];
+  return Object.entries(state.assignments)
+    .filter(([, roleId]) => roleId === "drunk")
+    .map(([playerIndex]) => Number(playerIndex));
+}
+
+function hasFortuneTellerContext() {
+  if (state.scriptId !== "tb") return false;
+  return Object.values(state.assignments).includes("fortuneteller")
+    || getTroubleBrewingDrunkIndexes().some(playerIndex => getDrunkBelievedRoleId(playerIndex) === "fortuneteller");
+}
+
+function getEligibleRedHerringIndexes() {
+  if (state.scriptId !== "tb") return [];
+  return Object.keys(state.assignments)
+    .map(Number)
+    .filter(playerIndex => TB.C[state.assignments[playerIndex]]?.team === "good");
+}
+
+function normalizeTroubleBrewingSetupState() {
+  state.drunkBelievedRoles = state.drunkBelievedRoles ?? {};
+  Object.keys(state.drunkBelievedRoles).forEach(playerIndex => {
+    if (!isTroubleBrewingDrunk(Number(playerIndex))) delete state.drunkBelievedRoles[playerIndex];
+  });
+
+  const eligibleBeliefs = new Set(getOutOfPlayTownsfolk().map(role => role.id));
+  getTroubleBrewingDrunkIndexes().forEach(playerIndex => {
+    if (!eligibleBeliefs.has(state.drunkBelievedRoles[playerIndex])) {
+      delete state.drunkBelievedRoles[playerIndex];
+    }
+  });
+
+  const eligibleRedHerrings = getEligibleRedHerringIndexes();
+  if (!hasFortuneTellerContext() || !eligibleRedHerrings.includes(Number(state.redHerringIndex))) {
+    state.redHerringIndex = null;
+  }
+}
+
+function setDrunkBelievedRole(playerIndex, roleId) {
+  if (!isTroubleBrewingDrunk(playerIndex)) return;
+  const isEligible = getOutOfPlayTownsfolk().some(role => role.id === roleId);
+  if (isEligible) state.drunkBelievedRoles[playerIndex] = roleId;
+  else delete state.drunkBelievedRoles[playerIndex];
+  normalizeTroubleBrewingSetupState();
+  autoSave();
+  render();
+}
+
+function setRedHerring(playerIndexValue) {
+  const playerIndex = Number(playerIndexValue);
+  state.redHerringIndex = getEligibleRedHerringIndexes().includes(playerIndex) ? playerIndex : null;
+  autoSave();
+  render();
+}
+
+function renderDrunkBeliefPicker(playerIndex) {
+  if (!isTroubleBrewingDrunk(playerIndex)) return "";
+  const believedRoleId = getDrunkBelievedRoleId(playerIndex);
+  const options = getOutOfPlayTownsfolk().map(role =>
+    `<option value="${role.id}" ${believedRoleId === role.id ? "selected" : ""}>${esc(role.name)}</option>`
+  ).join("");
+  return `
+    <div style="margin-top:8px;padding:10px;border:1px solid var(--orange);background:rgba(243,156,18,0.08);border-radius:7px">
+      <label for="drunk-belief-${playerIndex}" style="display:block;font-size:11px;font-weight:700;color:var(--orange);margin-bottom:5px">
+        BELIEVED TOWNSFOLK (required)
+      </label>
+      <select id="drunk-belief-${playerIndex}" class="input" onchange="setDrunkBelievedRole(${playerIndex}, this.value)">
+        <option value="">-- Choose an out-of-play Townsfolk --</option>
+        ${options}
+      </select>
+      <div style="font-size:10px;color:var(--text3);margin-top:5px">This is the only role card and ability shown to the player. Tap Swap to change the actual role.</div>
+    </div>
+  `;
+}
+
+function renderRedHerringSetup() {
+  if (!hasFortuneTellerContext()) return "";
+  const options = getEligibleRedHerringIndexes().map(playerIndex => {
+    const actualRole = TB.C[state.assignments[playerIndex]];
+    return `<option value="${playerIndex}" ${Number(state.redHerringIndex) === playerIndex ? "selected" : ""}>${esc(state.names[playerIndex])} — ${esc(actualRole?.name ?? "Good")}</option>`;
+  }).join("");
+  return `
+    <div class="card" style="padding:14px;border:1px solid var(--red);background:rgba(149,27,30,0.08);margin-bottom:16px">
+      <label for="red-herring-select" style="display:block;font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">FORTUNE TELLER RED HERRING (required)</label>
+      <select id="red-herring-select" class="input" onchange="setRedHerring(this.value)">
+        <option value="">-- Choose a good player --</option>
+        ${options}
+      </select>
+      <div style="font-size:10px;color:var(--text3);margin-top:5px">Used as the sober truth reference even when the Drunk only believes they are the Fortune Teller.</div>
+    </div>
+  `;
+}
+
 function renderRolesScreen() {
   if (S().setupMode === "physical-cards") {
     return renderPhysicalRoleEntryScreen();
   }
 
+  normalizeTroubleBrewingSetupState();
   const s = S();
   const chars = s.C;
 
@@ -750,10 +880,11 @@ function renderRolesScreen() {
     let roleDisplay = "";
     if (isAssigned) {
       const colors = roleColors(c);
+      const believedRole = chars[getDrunkBelievedRoleId(i)];
       roleDisplay = `
         <div style="display:flex;align-items:center;gap:8px;background:${colors.bg};border:1px solid ${colors.bdr}44;padding:4px 8px;border-radius:6px">
           ${renderRoleImage(c.id, c.type, 20)}
-          <span style="font-size:12px;font-weight:700;color:${colors.txt}">${c.name}</span>
+          <span style="font-size:12px;font-weight:700;color:${colors.txt}">${believedRole ? `${esc(believedRole.name)} (Drunk)` : esc(c.name)}</span>
           <span style="font-size:9px;text-transform:uppercase;color:var(--text3)">${c.type}</span>
         </div>
       `;
@@ -762,17 +893,20 @@ function renderRolesScreen() {
     }
 
     playerRows += `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="seat-num" style="background:${isAssigned ? roleColors(c).bdr : 'var(--border)'};border:none">${i + 1}</div>
-          <span style="font-weight:600;font-size:14px;color:var(--text)">${esc(state.names[i])}</span>
+      <div style="padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid ${isTroubleBrewingDrunk(i) && !getDrunkBelievedRoleId(i) ? 'var(--orange)' : 'var(--border)'};margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="seat-num" style="background:${isAssigned ? roleColors(c).bdr : 'var(--border)'};border:none">${i + 1}</div>
+            <span style="font-weight:600;font-size:14px;color:var(--text)">${esc(state.names[i])}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            ${roleDisplay}
+            <button class="btn-sm" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px" onclick="editPlayerRole(${i})">
+              ${isAssigned ? '⇄ Swap' : '+ Assign'}
+            </button>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:12px">
-          ${roleDisplay}
-          <button class="btn-sm" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px" onclick="editPlayerRole(${i})">
-            ${isAssigned ? '⇄ Swap' : '+ Assign'}
-          </button>
-        </div>
+        ${renderDrunkBeliefPicker(i)}
       </div>
     `;
   }
@@ -780,6 +914,9 @@ function renderRolesScreen() {
   // Render pool stats
   const poolCount = state.rolePool.length;
   const assignedCount = Object.keys(state.assignments).filter(k => state.assignments[k] !== "").length;
+  const missingDrunkBeliefs = getTroubleBrewingDrunkIndexes().filter(playerIndex => !getDrunkBelievedRoleId(playerIndex));
+  const missingRedHerring = hasFortuneTellerContext() && state.redHerringIndex === null;
+  const canFinalize = assignedCount >= state.playerCount && missingDrunkBeliefs.length === 0 && !missingRedHerring;
 
   return `
     <div class="screen fade-in" style="padding-top:16px">
@@ -815,7 +952,10 @@ function renderRolesScreen() {
         ${playerRows}
       </div>
 
-      <button class="btn btn-primary" ${assignedCount < state.playerCount ? 'class="btn btn-disabled" disabled' : ''} onclick="finalizeGrimoire()">
+      ${renderRedHerringSetup()}
+      ${missingDrunkBeliefs.length > 0 ? `<div class="warn warn-orange" role="alert">Choose an out-of-play believed Townsfolk for every Drunk before finalizing.</div>` : ""}
+      ${missingRedHerring ? `<div class="warn warn-red" role="alert">Choose the Fortune Teller's Red Herring before finalizing.</div>` : ""}
+      <button class="btn btn-primary" ${canFinalize ? "" : 'disabled'} onclick="finalizeGrimoire()">
         📖 Finalize Grimoire
       </button>
       <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='names';render()">← Back to Roster</button>
@@ -934,9 +1074,15 @@ function previousPhysicalRole() {
 
 function randomizeAssignments() {
   const shuffledPool = shuffle(state.rolePool);
+  const previousAssignments = { ...state.assignments };
   for (let i = 0; i < state.playerCount; i++) {
     state.assignments[i] = shuffledPool[i] || "";
   }
+  state.drunkBelievedRoles = state.drunkBelievedRoles ?? {};
+  for (let i = 0; i < state.playerCount; i++) {
+    if (previousAssignments[i] !== state.assignments[i]) delete state.drunkBelievedRoles[i];
+  }
+  normalizeTroubleBrewingSetupState();
   autoSave();
   render();
 }
@@ -975,10 +1121,14 @@ function editPlayerRole(playerIdx) {
 }
 
 function assignRoleToPlayer(pIdx, rid) {
+  const oldRole = state.assignments[pIdx];
   state.assignments[pIdx] = rid;
+  if (oldRole !== rid) {
+    state.drunkBelievedRoles = state.drunkBelievedRoles ?? {};
+    delete state.drunkBelievedRoles[pIdx];
+  }
   // If role chosen wasn't in pool, swap/append it dynamically
   if (!state.rolePool.includes(rid)) {
-    const oldRole = state.assignments[pIdx];
     const oldIdx = state.rolePool.indexOf(oldRole);
     if (oldIdx >= 0) {
       state.rolePool[oldIdx] = rid;
@@ -986,6 +1136,7 @@ function assignRoleToPlayer(pIdx, rid) {
       state.rolePool.push(rid);
     }
   }
+  normalizeTroubleBrewingSetupState();
   autoSave();
 }
 
@@ -1029,6 +1180,21 @@ function togglePoolRole(rid, enabled) {
 
 // Finalize the setup stage and enter Hand-off reveal
 function finalizeGrimoire() {
+  normalizeTroubleBrewingSetupState();
+  const hasMissingBelief = getTroubleBrewingDrunkIndexes().some(playerIndex => !getDrunkBelievedRoleId(playerIndex));
+  const hasMissingRedHerring = hasFortuneTellerContext() && state.redHerringIndex === null;
+  if (hasMissingBelief || hasMissingRedHerring) {
+    state.showCard = {
+      title: "Setup Incomplete",
+      emoji: "⚠️",
+      text: hasMissingBelief
+        ? "Every Trouble Brewing Drunk needs an out-of-play believed Townsfolk role."
+        : "Choose a good player as the Fortune Teller's Red Herring."
+    };
+    autoSave();
+    render();
+    return;
+  }
   // Complete initial states
   state.dayNum = 1;
   state.phase = "night";
@@ -1073,7 +1239,18 @@ function renderRevealScreen() {
   const pIdx = state.revealIndex;
   const pName = state.names[pIdx];
   const rId = state.assignments[pIdx];
-  const c = S().C[rId];
+  const believedRoleId = getDrunkBelievedRoleId(pIdx);
+  if (isTroubleBrewingDrunk(pIdx) && !believedRoleId) {
+    return `
+      <div class="screen fade-in" style="padding:32px 16px;text-align:center">
+        <div style="font-size:48px;margin-bottom:14px">🔒</div>
+        <h2 style="font-family:var(--font-serif);margin-bottom:8px">Private role not configured</h2>
+        <p style="color:var(--text3);font-size:13px;margin-bottom:20px">Return the device to the Storyteller to complete setup.</p>
+        <button class="btn btn-primary" onclick="abortToGrimSetup()">Return to Storyteller Setup</button>
+      </div>
+    `;
+  }
+  const c = S().C[believedRoleId || rId];
 
   const colors = TYPE_CLR[c.type];
   const alignLabel = c.team === "evil" ? "EVIL • DEMON / MINION" : "GOOD • TOWNSFOLK / OUTSIDER";
@@ -1147,24 +1324,132 @@ function abortToGrimSetup() {
 // ══════════════════════════════════════════════════════════════════════════
 // FLOW 5: GUIDED NIGHT PHASE SCREEN (`Night Phase.png`)
 // ══════════════════════════════════════════════════════════════════════════
+const TB_INFORMATION_ROLES = new Set([
+  "washerwoman", "librarian", "investigator", "chef", "empath",
+  "fortuneteller", "undertaker", "ravenkeeper"
+]);
+
+function getActiveWakeList(nightOrder) {
+  const activeWakeList = [];
+  nightOrder.forEach(nightNode => {
+    if (nightNode.id.startsWith("_")) {
+      activeWakeList.push({ ...nightNode, playerIndex: null, isDrunk: false });
+      return;
+    }
+
+    Object.entries(state.assignments).forEach(([playerIndexValue, actualRoleId]) => {
+      const playerIndex = Number(playerIndexValue);
+      if (isUltimateWerewolf()) {
+        if (actualRoleId === nightNode.id && state.alive[playerIndex] !== false) {
+          activeWakeList.push({ ...nightNode, playerIndex, isDrunk: false });
+        }
+        return;
+      }
+      if (actualRoleId === nightNode.id) {
+        activeWakeList.push({ ...nightNode, playerIndex, isDrunk: false });
+      }
+      if (isTroubleBrewingDrunk(playerIndex) && getDrunkBelievedRoleId(playerIndex) === nightNode.id) {
+        activeWakeList.push({ ...nightNode, playerIndex, isDrunk: true });
+      }
+    });
+  });
+  return activeWakeList;
+}
+
+function roleRosterByType(roleType) {
+  return Object.entries(state.assignments)
+    .filter(([, roleId]) => TB.C[roleId]?.type === roleType)
+    .map(([playerIndex, roleId]) => `${esc(state.names[playerIndex])} — ${esc(TB.C[roleId]?.name ?? roleId)}`)
+    .join("<br>");
+}
+
+function countChefEvilPairs() {
+  if (state.playerCount < 2) return 0;
+  let evilPairCount = 0;
+  for (let playerIndex = 0; playerIndex < state.playerCount; playerIndex++) {
+    const nextPlayerIndex = (playerIndex + 1) % state.playerCount;
+    const isCurrentEvil = TB.C[state.assignments[playerIndex]]?.team === "evil";
+    const isNextEvil = TB.C[state.assignments[nextPlayerIndex]]?.team === "evil";
+    if (isCurrentEvil && isNextEvil) evilPairCount++;
+  }
+  return evilPairCount;
+}
+
+function getEmpathTruth(playerIndex) {
+  const aliveOthers = Object.keys(state.assignments)
+    .map(Number)
+    .filter(otherIndex => otherIndex !== playerIndex && state.alive[otherIndex] !== false);
+  if (aliveOthers.length === 0) return "No other living players.";
+
+  const neighbours = [];
+  for (const direction of [-1, 1]) {
+    for (let distance = 1; distance < state.playerCount; distance++) {
+      const candidateIndex = (playerIndex + (direction * distance) + state.playerCount) % state.playerCount;
+      if (candidateIndex !== playerIndex && state.alive[candidateIndex] !== false) {
+        if (!neighbours.includes(candidateIndex)) neighbours.push(candidateIndex);
+        break;
+      }
+    }
+  }
+  const evilCount = neighbours.filter(neighbourIndex => TB.C[state.assignments[neighbourIndex]]?.team === "evil").length;
+  const neighbourLabels = neighbours.map(neighbourIndex =>
+    `${esc(state.names[neighbourIndex])} (${esc(TB.C[state.assignments[neighbourIndex]]?.name ?? "Unknown")})`
+  ).join(" and ");
+  return `Closest alive neighbours: ${neighbourLabels || "none"}. Sober evil count: <strong>${evilCount}</strong>.`;
+}
+
+function getDrunkTruthReference(roleId, playerIndex) {
+  if (state.scriptId !== "tb") return "";
+  if (roleId === "washerwoman") {
+    return `<strong>Sober reference — in-play Townsfolk:</strong><br>${roleRosterByType("townsfolk") || "None recorded."}`;
+  }
+  if (roleId === "librarian") {
+    return `<strong>Sober reference — in-play Outsiders:</strong><br>${roleRosterByType("outsider") || "No Outsiders are recorded in play."}`;
+  }
+  if (roleId === "investigator") {
+    return `<strong>Sober reference — in-play Minions:</strong><br>${roleRosterByType("minion") || "None recorded."}`;
+  }
+  if (roleId === "chef") {
+    return `<strong>Sober reference:</strong> current seating has <strong>${countChefEvilPairs()}</strong> adjacent evil pair(s), including the wraparound pair.`;
+  }
+  if (roleId === "empath") {
+    return `<strong>Sober reference:</strong> ${getEmpathTruth(playerIndex)}`;
+  }
+  if (roleId === "fortuneteller") {
+    const demons = Object.entries(state.assignments)
+      .filter(([, assignedRoleId]) => TB.C[assignedRoleId]?.type === "demon")
+      .map(([demonPlayerIndex, assignedRoleId]) => `${esc(state.names[demonPlayerIndex])} (${esc(TB.C[assignedRoleId]?.name ?? assignedRoleId)})`)
+      .join(", ") || "No Demon recorded";
+    const redHerringName = state.redHerringIndex === null ? "Not configured" : `${esc(state.names[state.redHerringIndex])} (Seat ${Number(state.redHerringIndex) + 1})`;
+    return `<strong>Sober reference:</strong> Demon: ${demons}. Red Herring: <strong>${redHerringName}</strong>. A selected target would sober-register YES only if they are one of these.`;
+  }
+  if (roleId === "ravenkeeper") {
+    return `<strong>Sober reference:</strong> the selected player's true role is shown beside their name in the target menu.`;
+  }
+  if (roleId === "undertaker") {
+    return `<strong>Sober reference unavailable:</strong> executions are not tracked by this app. Check today's actual executed character manually; do not invent a tracked result.`;
+  }
+  return "";
+}
+
+function renderDrunkNightWarning(activeNode) {
+  if (!activeNode.isDrunk) return "";
+  const truthReference = getDrunkTruthReference(activeNode.id, activeNode.playerIndex);
+  const misinformationWarning = TB_INFORMATION_ROLES.has(activeNode.id)
+    ? `<div class="warn warn-red" role="alert" style="margin:12px 0 0"><strong>DRUNK INFORMATION — GIVE INCORRECT INFORMATION.</strong><br>Use the sober truth below only as a reference, then deliberately provide misinformation.</div>`
+    : "";
+  return `
+    <div class="warn warn-orange" role="alert" style="margin:12px 0 0"><strong>FAKE / NO EFFECT.</strong> Wake ${esc(state.names[activeNode.playerIndex])} as the ${esc(TB.C[activeNode.id]?.name ?? activeNode.id)}, but never apply protection, death, poison, role changes, voting restrictions, or any other effect.</div>
+    ${misinformationWarning}
+    ${truthReference ? `<div style="margin-top:10px;padding:12px;border:1px solid var(--border);border-radius:7px;background:rgba(0,0,0,0.2);font-size:12px;line-height:1.6">${truthReference}</div>` : ""}
+  `;
+}
+
 function renderNightScreen() {
   const s = S();
   const nightOrder = state.dayNum === 1 ? s.FIRST_NIGHT : s.OTHER_NIGHT;
   
-  // Filter active wake order to only show elements in play
-  const activeWakeList = nightOrder.filter(n => {
-    // minion/demon info always wakes on Night 1
-    if (n.id.startsWith("_")) return true;
-
-    if (isUltimateWerewolf()) {
-      return Object.entries(state.assignments).some(([playerIndex, roleId]) => {
-        return roleId === n.id && state.alive[playerIndex] !== false;
-      });
-    }
-
-    // Check if role is in play
-    return Object.values(state.assignments).includes(n.id);
-  });
+  const activeWakeList = getActiveWakeList(nightOrder);
 
   const stepCount = activeWakeList.length;
 
@@ -1197,6 +1482,9 @@ function renderNightScreen() {
   let timelineItems = "";
   activeWakeList.forEach((n, idx) => {
     const rc = s.C[n.id] || { name: n.title || n.id, type: "demon" };
+    const wakeLabel = n.playerIndex === null
+      ? rc.name
+      : `${rc.name}${n.isDrunk ? " (Drunk)" : ""} — ${state.names[n.playerIndex]}`;
     const done = idx < state.activeWakeIdx;
     const current = idx === state.activeWakeIdx;
 
@@ -1204,21 +1492,21 @@ function renderNightScreen() {
       timelineItems += `
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;opacity:0.4">
           <span style="font-size:12px;color:var(--green)">✓</span>
-          <span style="font-size:13px;text-decoration:line-through">${rc.name}</span>
+          <span style="font-size:13px;text-decoration:line-through">${esc(wakeLabel)}</span>
         </div>
       `;
     } else if (current) {
       timelineItems += `
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;background:rgba(149, 27, 30, 0.12);border:1px solid rgba(149, 27, 30, 0.3);padding:6px 12px;border-radius:6px">
           <span style="font-size:10px;color:var(--red)">▶</span>
-          <strong style="font-size:13px;color:var(--text)">${rc.name}</strong>
+          <strong style="font-size:13px;color:var(--text)">${esc(wakeLabel)}</strong>
         </div>
       `;
     } else {
       timelineItems += `
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;opacity:0.35">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>
-          <span style="font-size:13px">${rc.name}</span>
+          <span style="font-size:13px">${esc(wakeLabel)}</span>
         </div>
       `;
     }
@@ -1233,7 +1521,7 @@ function renderNightScreen() {
     // Display checkboxes or player options
     let playerSelect = "";
     for (let i = 0; i < state.playerCount; i++) {
-      if (state.alive[i]) {
+      if (state.alive[i] || activeNode.id === "ravenkeeper") {
         playerSelect += `<option value="${i}">${esc(state.names[i])} (${s.C[state.assignments[i]]?.name})</option>`;
       }
     }
@@ -1246,7 +1534,7 @@ function renderNightScreen() {
             <option value="">-- Choose player target --</option>
             ${playerSelect}
           </select>
-          <button class="btn btn-primary" style="width:auto" onclick="submitNightTarget('${activeNode.id}')">Submit</button>
+          <button class="btn btn-primary" style="width:auto" onclick="submitNightTarget('${activeNode.id}', ${activeNode.playerIndex ?? "null"}, ${activeNode.isDrunk})">Submit</button>
         </div>
       </div>
     `;
@@ -1265,14 +1553,16 @@ function renderNightScreen() {
         
         <h3 style="font-family:var(--font-serif);font-size:28px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:10px">
           ${renderRoleImage(charDetails.id, charDetails.type, 32)}
-          ${esc(charDetails.name)}
+          ${esc(charDetails.name)}${activeNode.isDrunk ? " (Drunk)" : ""}
         </h3>
+        ${activeNode.playerIndex !== null ? `<div style="font-size:13px;color:var(--text2);margin:-6px 0 12px">Wake <strong>${esc(state.names[activeNode.playerIndex])}</strong> (Seat ${activeNode.playerIndex + 1})</div>` : ""}
 
         <div style="background:rgba(0,0,0,0.25);border:1px solid var(--border);padding:14px;border-radius:8px;font-size:13px;line-height:1.6;color:var(--text2);text-align:left">
           <strong>Storyteller Instructions:</strong><br>
           <span style="display:block;margin-top:4px;color:var(--orange)">${esc(wakeDesc)}</span>
         </div>
 
+        ${renderDrunkNightWarning(activeNode)}
         ${actionControls}
 
         <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:16px">
@@ -1293,16 +1583,30 @@ function renderNightScreen() {
   `;
 }
 
-function submitNightTarget(rid) {
+function submitNightTarget(rid, actingPlayerIndex = null, isDrunkAction = false) {
   const el = document.getElementById("night-target-select");
   if (!el || el.value === "") return;
   const pIdx = parseInt(el.value);
   const pName = state.names[pIdx];
 
-  state.nightLog.push({ roleId: rid, targetIndex: pIdx });
+  state.nightLog.push({
+    roleId: rid,
+    targetIndex: pIdx,
+    actingPlayerIndex,
+    fakeNoEffect: isDrunkAction
+  });
 
   // Custom logical actions based on scripts
-  if (rid === "poisoner") {
+  if (isDrunkAction) {
+    const believedRoleName = TB.C[rid]?.name ?? rid;
+    state.chronicle.push({
+      type: "night",
+      nightNum: state.dayNum,
+      title: `${believedRoleName} (Drunk) — Fake Action`,
+      details: `<strong>${esc(state.names[actingPlayerIndex])}</strong> selected <strong>${esc(pName)}</strong>. Logged for reference only; no effect was resolved.`,
+      badgeColor: "var(--orange)"
+    });
+  } else if (rid === "poisoner") {
     // Poison target
     state.chronicle.push({
       type: "night",
@@ -1822,7 +2126,9 @@ function renderGrimoireTab() {
   for (let i = 0; i < state.playerCount; i++) {
     const rId = state.assignments[i];
     const c = chars[rId];
-    const colors = roleColors(c);
+    const believedRole = chars[getDrunkBelievedRoleId(i)];
+    const displayRole = believedRole ?? c;
+    const colors = roleColors(displayRole);
     const isAlive = state.alive[i];
 
     let badgeText = isAlive ? "Alive" : "Dead";
@@ -1836,8 +2142,8 @@ function renderGrimoireTab() {
             <div>
               <span style="font-weight:700;font-size:15px;color:var(--text);${isAlive ? '' : 'text-decoration:line-through;opacity:0.6'}">${esc(state.names[i])}</span>
               <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-                <span style="font-size:11px;font-weight:700;color:${colors.txt}">${c.name}</span>
-                <span style="font-size:9px;color:var(--text3);text-transform:uppercase">(${esc(roleCategoryLabel(c))})</span>
+                <span style="font-size:11px;font-weight:700;color:${colors.txt}">${esc(displayRole.name)}${believedRole ? " (Drunk)" : ""}</span>
+                <span style="font-size:9px;color:var(--text3);text-transform:uppercase">(${esc(roleCategoryLabel(displayRole))})</span>
               </div>
             </div>
           </div>
@@ -1853,10 +2159,16 @@ function renderGrimoireTab() {
         <!-- Expansion drawer -->
         ${state.expandedPlayer === i ? `
           <div class="player-expand" style="border-top:1px solid var(--border);padding:14px;background:rgba(0,0,0,0.2);border-bottom-left-radius:10px;border-bottom-right-radius:10px">
-            <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">
-              <strong>Ability:</strong> ${esc(c.ab)}
-            </div>
-            ${c.variation ? `<div style="font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.5"><strong>Reference variation:</strong> ${esc(c.variation)}</div>` : ""}
+            ${believedRole ? `
+              <div class="warn warn-red" style="margin:0 0 10px"><strong>Actual character: Drunk.</strong> The believed ability has no effect.</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5"><strong>Believed ${esc(believedRole.name)} ability:</strong> ${esc(believedRole.ab)}</div>
+              <div class="warn warn-orange" style="margin:0 0 12px">For action, passive, and daytime abilities, manually ignore or nullify every assumed effect. The app will not resolve it.</div>
+            ` : `
+              <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">
+                <strong>Ability:</strong> ${esc(c.ab)}
+              </div>
+            `}
+            ${displayRole.variation ? `<div style="font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.5"><strong>Reference variation:</strong> ${esc(displayRole.variation)}</div>` : ""}
             ${isUltimateWerewolf() && !isAlive ? `<div class="warn warn-orange" style="margin:0 0 12px">May silently watch at night. Cannot act, be targeted, or vote.</div>` : ""}
             
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -1880,6 +2192,12 @@ function renderGrimoireTab() {
         <p style="color:var(--text3);font-size:13px">Active overview of player seats, tokens, and alignments.</p>
       </div>
 
+      ${state.scriptId === "tb" && hasFortuneTellerContext() ? `
+        <div class="card" style="padding:12px;border-color:var(--red);font-size:12px">
+          <strong style="color:var(--red)">🎯 Red Herring:</strong>
+          ${state.redHerringIndex === null ? "Not configured" : `${esc(state.names[state.redHerringIndex])} (Seat ${Number(state.redHerringIndex) + 1})`}
+        </div>
+      ` : ""}
       <div style="margin-bottom:24px">${playerGrid}</div>
 
       <button class="btn btn-outline" style="width:100%" onclick="state.confirm={msg:'Declare new game? This deletes session progress.',onYes:'resetEngine'};render()">
