@@ -8,16 +8,51 @@ const TYPE_CLR = {
   outsider:  { bg: "rgba(41, 128, 185, 0.08)", bdr: "#2980b9", txt: "#5dade2" },
   minion:    { bg: "rgba(142, 68, 173, 0.08)", bdr: "#8e44ad", txt: "#bb8fce" },
   demon:     { bg: "rgba(149, 27, 30, 0.08)", bdr: "#951B1E", txt: "#e74c3c" },
-  traveller: { bg: "rgba(243, 156, 18, 0.08)", bdr: "#f39c12", txt: "#f5b041" }
+  traveller: { bg: "rgba(243, 156, 18, 0.08)", bdr: "#f39c12", txt: "#f5b041" },
+  village:   { bg: "rgba(45, 90, 39, 0.08)", bdr: "#2D5A27", txt: "#a3e498" },
+  werewolf:  { bg: "rgba(149, 27, 30, 0.08)", bdr: "#951B1E", txt: "#e74c3c" },
+  vampire:   { bg: "rgba(94, 68, 92, 0.16)", bdr: "#9b59b6", txt: "#d7b5e8" },
+  cult:      { bg: "rgba(243, 156, 18, 0.08)", bdr: "#a56f16", txt: "#f5b041" },
+  solo:      { bg: "rgba(41, 128, 185, 0.08)", bdr: "#2980b9", txt: "#5dade2" },
+  artifact:  { bg: "rgba(214, 207, 192, 0.06)", bdr: "#8d877d", txt: "#D6CFC0" },
+  moderator: { bg: "rgba(214, 207, 192, 0.06)", bdr: "#666", txt: "#aaa" }
 };
-const TEMOJI = { townsfolk: "🏘️", outsider: "🌿", minion: "🗡️", demon: "👹", traveller: "🤹" };
+const TEMOJI = {
+  townsfolk: "🏘️", outsider: "🌿", minion: "🗡️", demon: "👹", traveller: "🤹",
+  village: "🏘️", werewolf: "🐺", vampire: "🧛", cult: "🕯️", solo: "🎯",
+  artifact: "🧿", moderator: "📖"
+};
 
 // Access the active script object
 function S() {
   if (state.scriptId === "tb") return TB;
   if (state.scriptId === "bmr") return BMR;
   if (state.scriptId === "sv") return SV;
+  if (state.scriptId === "uw") return UW;
   return TB;
+}
+
+function isUltimateWerewolf() {
+  return state.scriptId === "uw";
+}
+
+function roleColors(role) {
+  return TYPE_CLR[role?.type] ?? TYPE_CLR.artifact;
+}
+
+function roleCategoryLabel(role) {
+  if (!role) return "Unknown";
+  if (!isUltimateWerewolf()) return role.type;
+  const labels = {
+    village: "Village",
+    werewolf: "Werewolf team",
+    vampire: "Vampire team",
+    cult: "Cult",
+    solo: "Solo / conditional",
+    artifact: "Artifact",
+    moderator: "Moderator"
+  };
+  return labels[role.category] ?? role.category ?? role.type;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -46,7 +81,11 @@ function formatTime(secs) {
 // Render fallback character emojis or loaded images gracefully
 function renderRoleImage(roleId, type, size = 32, style = "") {
   if (!roleId || !type) return "";
-  const typeMap = { townsfolk: "townsfolk", outsider: "outsiders", minion: "minions", demon: "demons", traveller: "travellers" };
+  const typeMap = {
+    townsfolk: "townsfolk", outsider: "outsiders", minion: "minions", demon: "demons", traveller: "travellers",
+    village: "townsfolk", werewolf: "demons", vampire: "demons", cult: "minions", solo: "outsiders",
+    artifact: "travellers", moderator: "travellers"
+  };
   const dir = typeMap[type] || "townsfolk";
   const basePath = `assets/images/${dir}/${roleId}`;
   return `<img src="${basePath}.png" alt="${roleId}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:50%;background:rgba(0,0,0,0.1);padding:2px;${style}" onerror="this.outerHTML='<span style=\\'font-size:${size * 0.75}px;display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px\\'>${TEMOJI[type]||'❓'}</span>'">`;
@@ -68,6 +107,7 @@ let state = {
   dist: { t: 0, o: 0, m: 0, d: 0 }, // Modified distribution
   rolePool: [],           // List of role IDs selected in the game pool
   assignments: {},        // playerIndex -> roleId
+  roleEntryIndex: 0,      // moderator's current physical-card entry seat
   revealIndex: 0,         // Index of player during hand-off role reveal
 
   // Active game variables
@@ -83,6 +123,7 @@ let state = {
   chronicle: [],          // chronological logs of events: { type, nightNum, dayNum, title, details, badgeColor }
   drawerOpen: false,      // storyteller sidebar menu drawer state
   winTeam: null,          // good | evil
+  winnerSelection: [],    // Ultimate Werewolf team/player winner IDs
 
   // Timers
   timerSeconds: 300,
@@ -108,6 +149,7 @@ function autoSave() {
       names: state.names,
       rolePool: state.rolePool,
       assignments: state.assignments,
+      roleEntryIndex: state.roleEntryIndex,
       revealIndex: state.revealIndex,
       dayNum: state.dayNum,
       phase: state.phase,
@@ -120,6 +162,7 @@ function autoSave() {
       deathsLastNight: state.deathsLastNight,
       chronicle: state.chronicle,
       winTeam: state.winTeam,
+      winnerSelection: state.winnerSelection,
       timerSeconds: state.timerSeconds,
       timerTotal: state.timerTotal,
       tab: state.tab,
@@ -150,6 +193,7 @@ function resetEngine() {
     dist: { t: 0, o: 0, m: 0, d: 0 },
     rolePool: [],
     assignments: {},
+    roleEntryIndex: 0,
     revealIndex: 0,
     dayNum: 1,
     phase: "night",
@@ -163,6 +207,7 @@ function resetEngine() {
     chronicle: [],
     drawerOpen: false,
     winTeam: null,
+    winnerSelection: [],
     timerSeconds: 300,
     timerTotal: 300,
     timerRunning: false,
@@ -272,7 +317,7 @@ function renderOverlays() {
           <div style="display:flex;flex-direction:column;gap:8px">
             <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.confirm={msg:'Start a completely new session? Your current game will be erased.',onYes:'resetEngine'};render()">🔄 Reset Session</button>
             <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.showCard={title:'Volume Control',text:'Adjust phone notifications or alarm sounds. Digital clock sound registers automatically at countdown end.',emoji:'🔊'};render()">🔊 Alarm Volume</button>
-            <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.showCard={title:'Rulebook Quick Reference',text:'1. Good wins if the Demon dies and cannot make a starpass.\\n2. Evil wins if only 2 players are alive and the Demon survives.\\n3. Keep your private grim hidden from players during Night hand-offs!',emoji:'📖'};render()">📖 Rules Quickref</button>
+            <button class="btn btn-blue" style="justify-content:flex-start" onclick="showRulesQuickref()">📖 Rules Quickref</button>
           </div>
 
           <div style="margin-top:auto;border-top:1px solid var(--border);padding-top:16px;font-size:11px;color:var(--text3);text-align:center">
@@ -319,6 +364,30 @@ function renderOverlays() {
     `;
   }
 
+  if (state.showWinnerPicker && isUltimateWerewolf()) {
+    const winnerOptions = getUltimateWinnerOptions();
+    html += `
+      <div class="overlay" style="z-index:280" onclick="state.showWinnerPicker=false;render()">
+        <div class="show-card" style="background:var(--surface2);padding:24px;max-width:430px;text-align:left" onclick="event.stopPropagation()">
+          <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:6px">Declare Winner(s)</h3>
+          <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Select every team and individual role that won. The moderator resolves all conditions manually.</p>
+          <div style="max-height:55vh;overflow-y:auto;margin-bottom:16px">
+            ${winnerOptions.map(option => `
+              <label class="uw-winner-option">
+                <input type="checkbox" ${state.winnerSelection.includes(option.id) ? "checked" : ""} onchange="toggleUltimateWinner('${option.id}', this.checked)">
+                <span>${option.emoji} ${esc(option.label)}</span>
+              </label>
+            `).join("")}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" style="flex:1;margin:0" onclick="state.showWinnerPicker=false;render()">Cancel</button>
+            <button class="btn btn-primary" style="flex:1;margin:0" ${state.winnerSelection.length === 0 ? "disabled" : ""} onclick="confirmUltimateWinners()">Confirm winners</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   // Dismissible details card popup
   if (state.showCard) {
     html += `
@@ -334,6 +403,22 @@ function renderOverlays() {
   }
 
   return html;
+}
+
+function showRulesQuickref() {
+  toggleDrawer();
+  state.showCard = isUltimateWerewolf()
+    ? {
+        title: "Ultimate Werewolf Quick Reference",
+        text: "1. Discussion is public only.\\n2. Dead players cannot vote.\\n3. At night, dead players may keep their eyes open and silently watch, but do not act or become targets.\\n4. The moderator manually resolves role interactions and declares every applicable winner.",
+        emoji: "🐺"
+      }
+    : {
+        title: "Rulebook Quick Reference",
+        text: "1. Good wins if the Demon dies and cannot make a starpass.\\n2. Evil wins if only 2 players are alive and the Demon survives.\\n3. Keep your private grim hidden from players during Night hand-offs!",
+        emoji: "📖"
+      };
+  render();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -364,6 +449,14 @@ function renderSelectScreen() {
       color: "#9b59b6",
       desc: "Madness and misinformation rule. A highly complex script where alignments shift and information is rarely what it seems.",
       tag: "High madness and information control"
+    },
+    {
+      id: "uw",
+      name: "Ultimate Werewolf",
+      emoji: "🐺",
+      color: "#b7b8bd",
+      desc: "Record the physical deck, guide night wakes, and manually resolve the many team and solo victory conditions.",
+      tag: "Moderator physical-card mode"
     }
   ];
 
@@ -397,8 +490,13 @@ function pickScript(id) {
   state.scriptId = id;
   state.screen = "count";
   const s = S();
-  const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
-  state.dist = { ...d };
+  if (s.setupMode === "physical-cards") {
+    state.playerCount = Math.max(s.playerLimits.min, Math.min(s.playerLimits.max, state.playerCount));
+    state.dist = { t: 0, o: 0, m: 0, d: 0 };
+  } else {
+    const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
+    state.dist = { ...d };
+  }
   autoSave();
   render();
 }
@@ -410,13 +508,16 @@ function renderCountScreen() {
   const s = S();
   const d = state.dist;
   const total = (d.t || 0) + (d.o || 0) + (d.m || 0) + (d.d || 1);
-  const mismatch = total !== state.playerCount;
+  const usesPhysicalCards = s.setupMode === "physical-cards";
+  const mismatch = !usesPhysicalCards && total !== state.playerCount;
+  const minimumPlayers = s.playerLimits?.min ?? 5;
+  const maximumPlayers = s.playerLimits?.max ?? 15;
 
   return `
     <div class="screen fade-in" style="padding-top:16px">
       <div style="margin-bottom:24px">
         <h2 style="font-family:var(--font-serif);font-size:28px;margin-bottom:4px">Player Setup</h2>
-        <p style="color:var(--text3);font-size:13px">Gather your townsfolk. Determine the soul count for tonight's tragedy.</p>
+        <p style="color:var(--text3);font-size:13px">${usesPhysicalCards ? "Set the clockwise roster size before recording the dealt physical cards." : "Gather your townsfolk. Determine the soul count for tonight's tragedy."}</p>
       </div>
 
       <!-- Player Count Card -->
@@ -430,12 +531,18 @@ function renderCountScreen() {
         </div>
 
         <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">
-          <span>Min: 5 players</span>
-          <span>Max: 15 players</span>
+          <span>Min: ${minimumPlayers} players</span>
+          <span>Max: ${maximumPlayers} players</span>
         </div>
       </div>
 
       <!-- Distribution Preview Card -->
+      ${usesPhysicalCards ? `
+        <div class="card" style="padding:16px;border-radius:12px;background:rgba(0,0,0,0.15);margin-bottom:24px">
+          <div style="font-size:12px;font-weight:700;color:${s.color};margin-bottom:8px">PHYSICAL-CARD SETUP</div>
+          <p style="font-size:12px;color:var(--text2);line-height:1.6">No roles are distributed or randomized here. After entering the clockwise roster, the moderator records each player's dealt card in seat order. Card inventory limits are enforced.</p>
+        </div>
+      ` : `
       <div class="card" style="padding:16px;border-radius:12px;background:rgba(0,0,0,0.15);margin-bottom:24px;border:1px solid ${mismatch ? 'var(--red)' : 'transparent'}">
         <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;font-family:var(--font-serif);display:flex;justify-content:space-between;align-items:center;">
           <span>STANDARD DISTRIBUTION:</span>
@@ -477,6 +584,7 @@ function renderCountScreen() {
         </div>
         ${mismatch ? `<div style="color:var(--red);font-size:11px;margin-top:10px;text-align:center;font-weight:bold">⚠️ Distribution does not match player count!</div>` : ''}
       </div>
+      `}
 
       <button class="btn btn-primary" ${mismatch ? 'style="opacity:0.5;pointer-events:none"' : ''} onclick="proceedToNames()">Proceed to Player Roster →</button>
       <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='select';render()">← Back to Scripts</button>
@@ -495,10 +603,14 @@ function adjDist(type, delta) {
 }
 
 function adjCount(delta) {
-  state.playerCount = Math.max(5, Math.min(15, state.playerCount + delta));
   const s = S();
-  const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
-  state.dist = { ...d };
+  const minimumPlayers = s.playerLimits?.min ?? 5;
+  const maximumPlayers = s.playerLimits?.max ?? 15;
+  state.playerCount = Math.max(minimumPlayers, Math.min(maximumPlayers, state.playerCount + delta));
+  if (s.setupMode !== "physical-cards") {
+    const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
+    state.dist = { ...d };
+  }
   autoSave();
   render();
 }
@@ -571,6 +683,21 @@ function proceedToRoles() {
     }
   }
 
+  if (S().setupMode === "physical-cards") {
+    const existingAssignments = state.assignments ?? {};
+    state.assignments = {};
+    for (let i = 0; i < state.playerCount; i++) {
+      state.assignments[i] = existingAssignments[i] ?? "";
+    }
+    state.rolePool = Object.values(state.assignments).filter(Boolean);
+    const firstUnassigned = Object.values(state.assignments).findIndex(roleId => roleId === "");
+    state.roleEntryIndex = firstUnassigned >= 0 ? firstUnassigned : 0;
+    state.screen = "roles";
+    autoSave();
+    render();
+    return;
+  }
+
   // Populate dynamic role pool based on active script character list
   const d = state.dist || { t: 3, o: 0, m: 1, d: 1 };
   
@@ -604,6 +731,10 @@ function proceedToRoles() {
 // FLOW 3: ROLE POOL & ASSIGNMENT SCREEN (`Role Assignment.png`)
 // ══════════════════════════════════════════════════════════════════════════
 function renderRolesScreen() {
+  if (S().setupMode === "physical-cards") {
+    return renderPhysicalRoleEntryScreen();
+  }
+
   const s = S();
   const chars = s.C;
 
@@ -615,7 +746,7 @@ function renderRolesScreen() {
 
     let roleDisplay = "";
     if (isAssigned) {
-      const colors = TYPE_CLR[c.type];
+      const colors = roleColors(c);
       roleDisplay = `
         <div style="display:flex;align-items:center;gap:8px;background:${colors.bg};border:1px solid ${colors.bdr}44;padding:4px 8px;border-radius:6px">
           ${renderRoleImage(c.id, c.type, 20)}
@@ -630,7 +761,7 @@ function renderRolesScreen() {
     playerRows += `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:12px">
-          <div class="seat-num" style="background:${isAssigned ? TYPE_CLR[c.type].bdr : 'var(--border)'};border:none">${i + 1}</div>
+          <div class="seat-num" style="background:${isAssigned ? roleColors(c).bdr : 'var(--border)'};border:none">${i + 1}</div>
           <span style="font-weight:600;font-size:14px;color:var(--text)">${esc(state.names[i])}</span>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
@@ -687,6 +818,115 @@ function renderRolesScreen() {
       <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='names';render()">← Back to Roster</button>
     </div>
   `;
+}
+
+function getRoleUsage(roleId, ignoredPlayerIndex = -1) {
+  return Object.entries(state.assignments).filter(([playerIndex, assignedRoleId]) => {
+    return Number(playerIndex) !== ignoredPlayerIndex && assignedRoleId === roleId;
+  }).length;
+}
+
+function renderPhysicalRoleEntryScreen() {
+  const s = S();
+  const playerIndex = Math.max(0, Math.min(state.playerCount - 1, state.roleEntryIndex ?? 0));
+  const assignedCount = Object.values(state.assignments).filter(Boolean).length;
+  const currentRoleId = state.assignments[playerIndex] ?? "";
+  const sortedRoles = Object.values(s.C).sort((firstRole, secondRole) => firstRole.name.localeCompare(secondRole.name));
+  const roleButtons = sortedRoles.map(role => {
+    const usedQuantity = getRoleUsage(role.id);
+    const remainingQuantity = role.quantity - usedQuantity;
+    const isUnavailable = remainingQuantity <= 0 && currentRoleId !== role.id;
+    const colors = roleColors(role);
+    return `
+      <button class="uw-role-option" data-search="${esc(`${role.name} ${roleCategoryLabel(role)}`.toLowerCase())}"
+        style="border-color:${colors.bdr}55;background:${colors.bg}"
+        ${isUnavailable ? "disabled" : ""}
+        onclick="assignPhysicalRole(${playerIndex}, '${role.id}')">
+        <span style="display:flex;align-items:center;gap:8px;min-width:0">
+          ${renderRoleImage(role.id, role.type, 24)}
+          <span style="min-width:0">
+            <strong style="display:block;color:${colors.txt};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(role.name)}</strong>
+            <span style="font-size:9px;color:var(--text3);text-transform:uppercase">${esc(roleCategoryLabel(role))}</span>
+          </span>
+        </span>
+        <span style="font-size:10px;color:${isUnavailable ? "var(--red)" : "var(--text3)"};white-space:nowrap">${remainingQuantity} left</span>
+      </button>
+    `;
+  }).join("");
+
+  const assignmentSummary = Array.from({ length: state.playerCount }, (_, index) => {
+    const role = s.C[state.assignments[index]];
+    const colors = role ? roleColors(role) : null;
+    return `
+      <button class="uw-seat-summary ${index === playerIndex ? "active" : ""}" onclick="editPhysicalRole(${index})">
+        <span class="seat-num" style="background:${colors?.bdr ?? "var(--border)"};border:none">${index + 1}</span>
+        <span style="text-align:left;min-width:0;flex:1">
+          <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(state.names[index])}</strong>
+          <span style="font-size:10px;color:${colors?.txt ?? "var(--text3)"}">${role ? esc(role.name) : "Not recorded"}</span>
+        </span>
+      </button>
+    `;
+  }).join("");
+
+  return `
+    <div class="screen fade-in" style="padding-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:16px">
+        <div>
+          <h2 style="font-family:var(--font-serif);font-size:28px;margin-bottom:4px">Record Physical Cards</h2>
+          <p style="color:var(--text3);font-size:13px">Moderator entry only. Record each dealt card clockwise.</p>
+        </div>
+        <span class="phase-badge warn-red">${assignedCount}/${state.playerCount}</span>
+      </div>
+
+      <div class="card" style="padding:16px;border-color:${s.color}55">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;font-weight:700">Seat ${playerIndex + 1} of ${state.playerCount}</div>
+        <h3 style="font-size:22px;margin:3px 0 12px">${esc(state.names[playerIndex])}</h3>
+        <label for="uw-role-search" style="display:block;font-size:11px;font-weight:700;color:var(--text3);margin-bottom:5px">SEARCH ROLES</label>
+        <input id="uw-role-search" class="input" type="search" placeholder="Role name or category..." oninput="filterUltimateRoles(this.value)">
+        <div id="uw-role-options" class="uw-role-list">${roleButtons}</div>
+      </div>
+
+      <div class="card" style="padding:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">CLOCKWISE ROSTER — TAP TO EDIT</div>
+        <div class="uw-seat-grid">${assignmentSummary}</div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-outline" style="flex:1;margin:0" onclick="previousPhysicalRole()">← Previous</button>
+        <button class="btn btn-primary" style="flex:2;margin:0" ${assignedCount < state.playerCount ? "disabled" : ""} onclick="finalizeGrimoire()">📖 Finalize Roles</button>
+      </div>
+      <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='names';autoSave();render()">← Back to Roster</button>
+    </div>
+  `;
+}
+
+function filterUltimateRoles(searchValue) {
+  const normalizedSearch = String(searchValue ?? "").trim().toLowerCase();
+  document.querySelectorAll(".uw-role-option").forEach(option => {
+    option.hidden = normalizedSearch !== "" && !option.dataset.search.includes(normalizedSearch);
+  });
+}
+
+function assignPhysicalRole(playerIndex, roleId) {
+  const role = S().C[roleId];
+  if (!role || getRoleUsage(roleId, playerIndex) >= role.quantity) return;
+  state.assignments[playerIndex] = roleId;
+  state.rolePool = Object.values(state.assignments).filter(Boolean);
+  state.roleEntryIndex = Math.min(state.playerCount - 1, playerIndex + 1);
+  autoSave();
+  render();
+}
+
+function editPhysicalRole(playerIndex) {
+  state.roleEntryIndex = playerIndex;
+  autoSave();
+  render();
+}
+
+function previousPhysicalRole() {
+  state.roleEntryIndex = Math.max(0, (state.roleEntryIndex ?? 0) - 1);
+  autoSave();
+  render();
 }
 
 function randomizeAssignments() {
@@ -793,6 +1033,7 @@ function finalizeGrimoire() {
   state.nightLog = [];
   state.revealIndex = 0;
   state.winTeam = null;
+  state.winnerSelection = [];
 
   // Set initial alive status
   state.alive = {};
@@ -808,13 +1049,16 @@ function finalizeGrimoire() {
   state.chronicle = [
     {
       type: "system",
-      title: "Tragedy Begins",
-      details: `A new game of <strong>${S().name}</strong> has commenced at Ravenswood Bluff with ${state.playerCount} players.`,
+      title: isUltimateWerewolf() ? "The Village Sleeps" : "Tragedy Begins",
+      details: isUltimateWerewolf()
+        ? `A new game of <strong>${S().name}</strong> has begun with ${state.playerCount} recorded physical cards. Role interactions will be resolved by the moderator.`
+        : `A new game of <strong>${S().name}</strong> has commenced at Ravenswood Bluff with ${state.playerCount} players.`,
       badgeColor: "var(--border)"
     }
   ];
 
-  state.screen = "reveal";
+  state.screen = isUltimateWerewolf() ? "game" : "reveal";
+  if (isUltimateWerewolf()) state.tab = "night";
   autoSave();
   render();
 }
@@ -908,7 +1152,13 @@ function renderNightScreen() {
   const activeWakeList = nightOrder.filter(n => {
     // minion/demon info always wakes on Night 1
     if (n.id.startsWith("_")) return true;
-    
+
+    if (isUltimateWerewolf()) {
+      return Object.entries(state.assignments).some(([playerIndex, roleId]) => {
+        return roleId === n.id && state.alive[playerIndex] !== false;
+      });
+    }
+
     // Check if role is in play
     return Object.values(state.assignments).includes(n.id);
   });
@@ -930,7 +1180,15 @@ function renderNightScreen() {
   }
 
   const activeNode = activeWakeList[state.activeWakeIdx];
-  const charDetails = s.C[activeNode.id] || { name: activeNode.title || activeNode.id, type: "demon", ab: "", fn_r: "", on_r: "" };
+  const charDetails = s.C[activeNode.id] || {
+    id: activeNode.id,
+    name: activeNode.title || activeNode.id,
+    type: isUltimateWerewolf() ? "moderator" : "demon",
+    category: isUltimateWerewolf() ? "moderator" : "demon",
+    ab: "",
+    fn_r: "",
+    on_r: ""
+  };
 
   // Waking list timeline builder
   let timelineItems = "";
@@ -964,7 +1222,8 @@ function renderNightScreen() {
   });
 
   // Action variables checklist
-  const wakeDesc = state.dayNum === 1 ? (charDetails.fn_r || "Give info") : (charDetails.on_r || "Perform action");
+  const wakeDesc = activeNode.instructions
+    ?? (state.dayNum === 1 ? (charDetails.fn_r || "Give info") : (charDetails.on_r || "Perform action"));
   let actionControls = "";
 
   if (!activeNode.id.startsWith("_")) {
@@ -996,14 +1255,14 @@ function renderNightScreen() {
       <div class="card" style="border-radius:12px;border-color:var(--border);padding:24px;margin-bottom:18px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <span style="font-size:10px;font-weight:700;color:${TYPE_CLR[charDetails.type]?.txt || 'var(--text3)'};text-transform:uppercase;letter-spacing:1.5px">
-            ${(charDetails.type || 'SYSTEM').toUpperCase()} • ACTION REQUIRED
+            ${esc(roleCategoryLabel(charDetails).toUpperCase())} • ${activeNode.id.startsWith("_") ? "REMINDER" : "ACTION REQUIRED"}
           </span>
           <span style="font-size:11px;color:var(--text3)">${state.activeWakeIdx + 1} of ${stepCount}</span>
         </div>
         
         <h3 style="font-family:var(--font-serif);font-size:28px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:10px">
           ${renderRoleImage(charDetails.id, charDetails.type, 32)}
-          ${charDetails.name}
+          ${esc(charDetails.name)}
         </h3>
 
         <div style="background:rgba(0,0,0,0.25);border:1px solid var(--border);padding:14px;border-radius:8px;font-size:13px;line-height:1.6;color:var(--text2);text-align:left">
@@ -1089,6 +1348,7 @@ function proceedToDay() {
   // Apply overnight deaths
   state.deathsLastNight.forEach(pIdx => {
     state.alive[pIdx] = false;
+    if (isUltimateWerewolf()) state.votes[pIdx] = 0;
   });
 
   // Chronicle day entry
@@ -1145,7 +1405,9 @@ function renderDayScreen() {
       <input type="checkbox" style="width:18px;height:18px">
       <div style="flex:1">
         <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase">Reminder</div>
-        <span style="font-size:13px;color:var(--text2)">Announce that public nominations are open now. Dead players retain 1 vote token!</span>
+        <span style="font-size:13px;color:var(--text2)">${isUltimateWerewolf()
+          ? "Open public discussion. Private discussions are not used. Dead players may observe but cannot vote."
+          : "Announce that public nominations are open now. Dead players retain 1 vote token!"}</span>
       </div>
       <span style="font-size:20px">🔔</span>
     </div>
@@ -1184,7 +1446,9 @@ function renderTimerScreen() {
     <div style="padding:16px;text-align:center">
       <div style="margin-bottom:20px">
         <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:4px">Town Square</h3>
-        <p style="color:var(--text3);font-size:13px">Day Phase — private/public discussions.</p>
+        <p style="color:var(--text3);font-size:13px">${isUltimateWerewolf()
+          ? "Day Phase — public discussion only. Dead players cannot vote."
+          : "Day Phase — private/public discussions."}</p>
       </div>
 
       <!-- Circular Timer Dial -->
@@ -1225,10 +1489,12 @@ function renderTimerScreen() {
       </button>
 
       <!-- Declare winner trigger -->
-      <div style="display:flex;gap:8px">
+      ${isUltimateWerewolf() ? `
+        <button class="btn btn-primary" onclick="openUltimateWinnerPicker()">🏆 Declare Winner(s)</button>
+      ` : `<div style="display:flex;gap:8px">
         <button class="btn btn-blue" style="flex:1;background:rgba(45, 90, 39, 0.1);color:var(--green);border-color:var(--green)33;margin:0" onclick="triggerWin('good')">😇 Good Wins</button>
         <button class="btn btn-blue" style="flex:1;background:rgba(149, 27, 30, 0.1);color:var(--red);border-color:var(--red)33;margin:0" onclick="triggerWin('evil')">😈 Evil Wins</button>
-      </div>
+      </div>`}
     </div>
   `;
 }
@@ -1301,6 +1567,59 @@ function playAlarmAudio() {
   } catch(e) {}
 }
 
+function getUltimateWinnerOptions() {
+  if (!isUltimateWerewolf()) return [];
+  const teamOptions = S().winnerGroups.map(group => ({
+    id: `team:${group.id}`,
+    label: group.label,
+    emoji: group.emoji
+  }));
+  const individualOptions = Object.entries(state.assignments)
+    .filter(([, roleId]) => S().soloWinnerRoles.includes(roleId))
+    .map(([playerIndex, roleId]) => ({
+      id: `player:${playerIndex}`,
+      label: `${state.names[playerIndex]} — ${S().C[roleId].name}`,
+      emoji: "🎯"
+    }));
+  return [...teamOptions, ...individualOptions];
+}
+
+function openUltimateWinnerPicker() {
+  state.showWinnerPicker = true;
+  state.winnerSelection = state.winnerSelection ?? [];
+  autoSave();
+  render();
+}
+
+function toggleUltimateWinner(winnerId, isSelected) {
+  const currentSelection = new Set(state.winnerSelection ?? []);
+  if (isSelected) currentSelection.add(winnerId);
+  else currentSelection.delete(winnerId);
+  state.winnerSelection = [...currentSelection];
+  autoSave();
+  render();
+}
+
+function ultimateWinnerLabel(winnerId) {
+  return getUltimateWinnerOptions().find(option => option.id === winnerId)?.label ?? winnerId;
+}
+
+function confirmUltimateWinners() {
+  if (!isUltimateWerewolf() || (state.winnerSelection?.length ?? 0) === 0) return;
+  const winnerLabels = state.winnerSelection.map(ultimateWinnerLabel);
+  state.winTeam = "manual";
+  state.showWinnerPicker = false;
+  state.screen = "victory";
+  state.chronicle.push({
+    type: "system",
+    title: "Game Concluded",
+    details: `The moderator declared the following winner${winnerLabels.length === 1 ? "" : "s"}: <strong>${winnerLabels.map(esc).join(", ")}</strong>.`,
+    badgeColor: "var(--orange)"
+  });
+  autoSave();
+  render();
+}
+
 function triggerWin(team) {
   state.winTeam = team;
   state.screen = "victory";
@@ -1334,6 +1653,26 @@ function proceedToNightStep() {
 // FLOW 8: VICTORY SCREEN (`Victory Screen.png`)
 // ══════════════════════════════════════════════════════════════════════════
 function renderVictoryScreen() {
+  if (isUltimateWerewolf()) {
+    const winnerLabels = (state.winnerSelection ?? []).map(ultimateWinnerLabel);
+    return `
+      <div class="screen fade-in" style="padding-top:32px;text-align:center">
+        <div style="width:160px;height:160px;border-radius:50%;background:rgba(243,156,18,0.05);border:2px dashed var(--orange);box-shadow:0 0 40px rgba(243,156,18,0.2);margin:0 auto 24px;display:flex;align-items:center;justify-content:center;animation:pulse 2s infinite">
+          <span style="font-size:72px">🏆</span>
+        </div>
+        <h1 style="font-family:var(--font-serif);font-size:38px;color:var(--orange);margin-bottom:12px">WINNERS DECLARED</h1>
+        <p style="color:var(--text3);font-size:13px;margin-bottom:16px">Ultimate Werewolf supports simultaneous team and role victories.</p>
+        <div class="card" style="text-align:left;margin-bottom:24px">
+          ${winnerLabels.map(label => `<div style="padding:8px;border-bottom:1px solid var(--border)">🏅 ${esc(label)}</div>`).join("")}
+        </div>
+        <button class="btn btn-primary" onclick="showChronicleEnd()">📖 View Game Summary</button>
+        <div style="margin-top:40px;text-align:right">
+          <button class="timer-adj-btn" aria-label="Reset and start a new game" style="width:48px;height:48px;border-radius:50%;display:inline-flex" onclick="resetEngine()">↻</button>
+        </div>
+      </div>
+    `;
+  }
+
   const isGood = state.winTeam === "good";
   const colors = isGood ? TYPE_CLR.townsfolk : TYPE_CLR.demon;
   const title = isGood ? "TOWNSFOLK WIN" : "DEMONS WIN";
@@ -1480,7 +1819,7 @@ function renderGrimoireTab() {
   for (let i = 0; i < state.playerCount; i++) {
     const rId = state.assignments[i];
     const c = chars[rId];
-    const colors = TYPE_CLR[c.type];
+    const colors = roleColors(c);
     const isAlive = state.alive[i];
 
     let badgeText = isAlive ? "Alive" : "Dead";
@@ -1495,7 +1834,7 @@ function renderGrimoireTab() {
               <span style="font-weight:700;font-size:15px;color:var(--text);${isAlive ? '' : 'text-decoration:line-through;opacity:0.6'}">${esc(state.names[i])}</span>
               <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
                 <span style="font-size:11px;font-weight:700;color:${colors.txt}">${c.name}</span>
-                <span style="font-size:9px;color:var(--text3);text-transform:uppercase">(${c.type})</span>
+                <span style="font-size:9px;color:var(--text3);text-transform:uppercase">(${esc(roleCategoryLabel(c))})</span>
               </div>
             </div>
           </div>
@@ -1514,14 +1853,16 @@ function renderGrimoireTab() {
             <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">
               <strong>Ability:</strong> ${esc(c.ab)}
             </div>
+            ${c.variation ? `<div style="font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.5"><strong>Reference variation:</strong> ${esc(c.variation)}</div>` : ""}
+            ${isUltimateWerewolf() && !isAlive ? `<div class="warn warn-orange" style="margin:0 0 12px">May silently watch at night. Cannot act, be targeted, or vote.</div>` : ""}
             
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
               <button class="btn-sm" style="flex:1;background:${isAlive ? 'var(--red)15' : 'var(--green)15'};color:${isAlive ? 'var(--red)' : 'var(--green)'};border:1px solid ${isAlive ? 'var(--red)' : 'var(--green)'}44" onclick="togglePlayerAlive(${i})">
                 ${isAlive ? '☠️ Mark Dead' : '💖 Resurrect'}
               </button>
-              <button class="btn-sm" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text)" onclick="triggerStarpass(${i})">
+              ${isUltimateWerewolf() ? "" : `<button class="btn-sm" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text)" onclick="triggerStarpass(${i})">
                 👑 Trigger Starpass
-              </button>
+              </button>`}
             </div>
           </div>
         ` : ''}
@@ -1552,6 +1893,7 @@ function togglePlayerExpand(idx) {
 
 function togglePlayerAlive(idx) {
   state.alive[idx] = !state.alive[idx];
+  if (isUltimateWerewolf()) state.votes[idx] = state.alive[idx] ? 1 : 0;
   
   // Log changes to chronicle
   state.chronicle.push({
