@@ -636,7 +636,10 @@ function adjCount(delta) {
   render();
 }
 function proceedToNames() {
-  // Pad names array to length
+  // Pad or trim names array to length
+  if (state.names.length > state.playerCount) {
+    state.names = state.names.slice(0, state.playerCount);
+  }
   while (state.names.length < state.playerCount) {
     state.names.push("");
   }
@@ -705,6 +708,7 @@ function proceedToRoles() {
   }
 
   if (S().setupMode === "physical-cards") {
+    state.uwSearchQuery = "";
     const existingAssignments = state.assignments ?? {};
     state.assignments = {};
     for (let i = 0; i < state.playerCount; i++) {
@@ -986,15 +990,18 @@ function renderPhysicalRoleEntryScreen() {
   const assignedCount = Object.values(state.assignments).filter(Boolean).length;
   const currentRoleId = state.assignments[playerIndex] ?? "";
   const sortedRoles = Object.values(s.C).sort((firstRole, secondRole) => firstRole.name.localeCompare(secondRole.name));
+  const searchQuery = state.uwSearchQuery ?? "";
   const roleButtons = sortedRoles.map(role => {
     const usedQuantity = getRoleUsage(role.id);
     const remainingQuantity = role.quantity - usedQuantity;
     const isUnavailable = remainingQuantity <= 0 && currentRoleId !== role.id;
     const colors = roleColors(role);
+    const matchesSearch = searchQuery === "" || `${role.name} ${roleCategoryLabel(role)}`.toLowerCase().includes(searchQuery.trim().toLowerCase());
     return `
       <button class="uw-role-option" data-search="${esc(`${role.name} ${roleCategoryLabel(role)}`.toLowerCase())}"
         style="border-color:${colors.bdr}55;background:${colors.bg}"
         ${isUnavailable ? "disabled" : ""}
+        ${matchesSearch ? "" : "hidden"}
         onclick="assignPhysicalRole(${playerIndex}, '${role.id}')">
         <span style="display:flex;align-items:center;gap:8px;min-width:0">
           ${renderRoleImage(role.id, role.type, 24)}
@@ -1036,7 +1043,7 @@ function renderPhysicalRoleEntryScreen() {
         <div style="font-size:10px;color:var(--text3);text-transform:uppercase;font-weight:700">Seat ${playerIndex + 1} of ${state.playerCount}</div>
         <h3 style="font-size:22px;margin:3px 0 12px">${esc(state.names[playerIndex])}</h3>
         <label for="uw-role-search" style="display:block;font-size:11px;font-weight:700;color:var(--text3);margin-bottom:5px">SEARCH ROLES</label>
-        <input id="uw-role-search" class="input" type="search" placeholder="Role name or category..." oninput="filterUltimateRoles(this.value)">
+        <input id="uw-role-search" class="input" type="search" placeholder="Role name or category..." value="${esc(searchQuery)}" oninput="filterUltimateRoles(this.value)">
         <div id="uw-role-options" class="uw-role-list">${roleButtons}</div>
       </div>
 
@@ -1055,6 +1062,7 @@ function renderPhysicalRoleEntryScreen() {
 }
 
 function filterUltimateRoles(searchValue) {
+  state.uwSearchQuery = searchValue;
   const normalizedSearch = String(searchValue ?? "").trim().toLowerCase();
   document.querySelectorAll(".uw-role-option").forEach(option => {
     option.hidden = normalizedSearch !== "" && !option.dataset.search.includes(normalizedSearch);
