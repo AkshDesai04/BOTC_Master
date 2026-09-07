@@ -137,6 +137,7 @@ let state = {
   tab: "grimoire",        // grimoire | night | day | chronicle
   confirm: null,          // confirm dialog modal state
   showCard: null,         // popup dismissible card modal state
+  toast: null,            // non-blocking toast { message, tone }
 };
 
 // Auto save state
@@ -220,7 +221,8 @@ function resetEngine() {
     timerIntervalId: null,
     tab: "grimoire",
     confirm: null,
-    showCard: null
+    showCard: null,
+    toast: null
   };
   autoSave();
   render();
@@ -275,6 +277,14 @@ function render() {
   }
 
   html += renderOverlays();
+  if (state.toast) {
+    const toastTone = state.toast.tone === "error" ? "var(--red)" : state.toast.tone === "success" ? "var(--green)" : "var(--text2)";
+    html += `
+      <div role="status" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:400;max-width:90%;background:var(--surface2);border:1px solid ${toastTone};color:var(--text);padding:12px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.45);font-size:13px;line-height:1.4;text-align:center">
+        ${esc(state.toast.message ?? "")}
+      </div>
+    `;
+  }
   app.innerHTML = html;
 
   // Roster input focus helper
@@ -532,7 +542,7 @@ function renderCountScreen() {
   const usesPhysicalCards = s.setupMode === "physical-cards";
   const mismatch = !usesPhysicalCards && total !== state.playerCount;
   const minimumPlayers = s.playerLimits?.min ?? 5;
-  const maximumPlayers = s.playerLimits?.max ?? 15;
+  const maximumPlayers = s.playerLimits?.max ?? 20;
 
   return `
     <div class="screen fade-in" style="padding-top:16px">
@@ -626,7 +636,7 @@ function adjDist(type, delta) {
 function adjCount(delta) {
   const s = S();
   const minimumPlayers = s.playerLimits?.min ?? 5;
-  const maximumPlayers = s.playerLimits?.max ?? 15;
+  const maximumPlayers = s.playerLimits?.max ?? 20;
   state.playerCount = Math.max(minimumPlayers, Math.min(maximumPlayers, state.playerCount + delta));
   if (s.setupMode !== "physical-cards") {
     const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
@@ -940,7 +950,10 @@ function renderRolesScreen() {
           <h2 style="font-family:var(--font-serif);font-size:28px;margin-bottom:4px">Role Assignment</h2>
           <p style="color:var(--text3);font-size:13px">Distribute role tokens to the roster.</p>
         </div>
-        <button class="btn-outline" style="padding:6px 12px;font-size:11px" onclick="randomizeAssignments()">🔀 Randomize All</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn-outline" style="padding:6px 12px;font-size:11px" onclick="randomizeUnselectedAssignments()">🎲 Randomize Unselected</button>
+          <button class="btn-outline" style="padding:6px 12px;font-size:11px" onclick="randomizeAssignments()">🔀 Randomize All</button>
+        </div>
       </div>
 
       <!-- Role Pool Display Card -->
@@ -1103,6 +1116,27 @@ function randomizeAssignments() {
   render();
 }
 
+function randomizeUnselectedAssignments() {
+  const remainingPool = [...state.rolePool];
+  for (let i = 0; i < state.playerCount; i++) {
+    const assignedRoleId = state.assignments[i];
+    if (!assignedRoleId) continue;
+    const poolIndex = remainingPool.indexOf(assignedRoleId);
+    if (poolIndex >= 0) remainingPool.splice(poolIndex, 1);
+  }
+  const shuffledRemainder = shuffle(remainingPool);
+  let remainderIndex = 0;
+  for (let i = 0; i < state.playerCount; i++) {
+    if (state.assignments[i]) continue;
+    state.assignments[i] = shuffledRemainder[remainderIndex++] || "";
+  }
+  normalizeTroubleBrewingSetupState();
+  assignRandomDrunkBelievedRoles();
+  normalizeTroubleBrewingSetupState();
+  autoSave();
+  render();
+}
+
 // Edit a single player's role assignment manually
 function editPlayerRole(playerIdx) {
   const s = S();
@@ -1195,6 +1229,88 @@ function togglePoolRole(rid, enabled) {
 }
 
 // Finalize the setup stage and enter Hand-off reveal
+function buildRosterEmailBody() {
+  const script = S();
+  const lines = [
+    `Script: ${script.name}`,
+    `Players: ${state.playerCount}`,
+    "",
+    "Roster:"
+  ];
+  for (let seatIndex = 0; seatIndex < state.playerCount; seatIndex++) {
+    const roleId = state.assignments[seatIndex];
+    const role = script.C[roleId];
+    const playerName = state.names[seatIndex] ?? `Player ${seatIndex + 1}`;
+    let roleLabel = role?.name ?? roleId ?? "Unassigned";
+    if (isTroubleBrewingDrunk(seatIndex)) {
+      const believedRoleId = getDrunkBelievedRoleId(seatIndex);
+      const believedRole = script.C[believedRoleId];
+      roleLabel = believedRole
+        ? `Drunk (assumed ${believedRole.name})`
+        : "Drunk (assumed role not set)";
+    }
+    lines.push(`Seat ${seatIndex + 1}: ${playerName} — ${roleLabel}`);
+  }
+  if (state.redHerringIndex !== null && state.redHerringIndex !== undefined) {
+    const herringSeat = Number(state.redHerringIndex) + 1;
+    const herringName = state.names[state.redHerringIndex] ?? `Player ${herringSeat}`;
+    lines.push("", `Red Herring: Seat ${herringSeat} — ${herringName}`);
+  }
+  return lines.join("\n");
+}
+
+function showToast(message, tone = "info") {
+  state.toast = { message, tone };
+  render();
+  window.clearTimeout(showToast._timerId);
+  showToast._timerId = window.setTimeout(() => {
+    if (state.toast?.message === message) {
+      state.toast = null;
+      render();
+    }
+  }, 4500);
+}
+
+async function dispatchRosterEmail() {
+  if (isUltimateWerewolf()) return;
+  const config = window.ROSTER_DISPATCH_CONFIG ?? {};
+  const owner = config.owner ?? "AkshDesai04";
+  const repo = config.repo ?? "BOTC_Master";
+  const token = config.token ?? "";
+  if (!token) {
+    showToast("Roster email not configured (missing dispatch token).", "error");
+    return;
+  }
+
+  const subject = `${S().name} roster — ${state.playerCount} players`;
+  const body = buildRosterEmailBody();
+  try {
+    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/dispatches`, {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      },
+      body: JSON.stringify({
+        event_type: "send-roster-email",
+        client_payload: { subject, body }
+      })
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      console.error("Roster email dispatch failed:", response.status, detail);
+      showToast("Roster email dispatch failed. Finalize continued.", "error");
+      return;
+    }
+    showToast("Roster email queued.", "success");
+  } catch (error) {
+    console.error("Roster email dispatch error:", error);
+    showToast("Roster email dispatch failed. Finalize continued.", "error");
+  }
+}
+
 function finalizeGrimoire() {
   normalizeTroubleBrewingSetupState();
   const hasMissingBelief = getTroubleBrewingDrunkIndexes().some(playerIndex => !getDrunkBelievedRoleId(playerIndex));
@@ -1245,6 +1361,7 @@ function finalizeGrimoire() {
   state.screen = isUltimateWerewolf() ? "game" : "reveal";
   if (isUltimateWerewolf()) state.tab = "night";
   autoSave();
+  void dispatchRosterEmail();
   render();
 }
 

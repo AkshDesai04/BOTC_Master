@@ -212,5 +212,6 @@ const BMR = {
   demonFixed: false,      // Choose from 4 demons
   defaultDemon: [],
   hasDrunk: false,
+  playerLimits: { min: 5, max: 15 },
   TRAVELLERS: BMR_TRAVELLERS,
 };

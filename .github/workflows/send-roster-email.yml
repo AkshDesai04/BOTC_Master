@@ -1,0 +1,55 @@
+name: Send roster email
+
+on:
+  repository_dispatch:
+    types: [send-roster-email]
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install nodemailer
+        run: npm install nodemailer@6
+
+      - name: Send roster email via SMTP
+        env:
+          SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          MAIL_SUBJECT: ${{ github.event.client_payload.subject }}
+          MAIL_BODY: ${{ github.event.client_payload.body }}
+        run: |
+          node <<'EOF'
+          const nodemailer = require('nodemailer');
+          const smtpEmail = process.env.SMTP_EMAIL;
+          const smtpPassword = process.env.SMTP_APP_PASSWORD;
+          if (!smtpEmail || !smtpPassword) {
+            console.error('SMTP_EMAIL and SMTP_APP_PASSWORD secrets are required.');
+            process.exit(1);
+          }
+          const subject = process.env.MAIL_SUBJECT || 'BOTC roster';
+          const body = process.env.MAIL_BODY || '';
+          (async () => {
+            const transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: {
+                user: smtpEmail,
+                pass: smtpPassword
+              }
+            });
+            await transporter.sendMail({
+              from: smtpEmail,
+              to: smtpEmail,
+              subject,
+              text: body
+            });
+            console.log('Roster email sent.');
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          EOF
