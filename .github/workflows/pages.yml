@@ -27,7 +27,11 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
-          token = os.environ.get("ROSTER_DISPATCH_TOKEN", "")
+          import sys
+          token = os.environ.get("ROSTER_DISPATCH_TOKEN", "").strip()
+          if not token:
+              print("ROSTER_DISPATCH_TOKEN secret is missing or empty.", file=sys.stderr)
+              sys.exit(1)
           # Escape for JS string literal
           safe = token.replace("\\", "\\\\").replace('"', '\\"')
           content = f'''window.ROSTER_DISPATCH_CONFIG = {{
@@ -38,6 +42,7 @@ jobs:
           '''
           with open("scripts/runtime-config.js", "w", encoding="utf-8") as handle:
               handle.write(content)
+          print("Injected roster dispatch config (token length=%d)." % len(token))
           PY
 
       - name: Setup Pages
