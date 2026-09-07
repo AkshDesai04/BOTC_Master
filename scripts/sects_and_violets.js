@@ -203,5 +203,6 @@ const SV = {
   demonFixed: false,
   defaultDemon: [],
   hasDrunk: false,
+  playerLimits: { min: 5, max: 15 },
   TRAVELLERS: SV_TRAVELLERS,
 };
