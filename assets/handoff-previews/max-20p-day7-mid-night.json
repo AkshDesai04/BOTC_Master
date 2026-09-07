@@ -1,0 +1,635 @@
+{
+  "kind": "botc-handoff",
+  "v": 1,
+  "scriptId": "tb",
+  "game": {
+    "screen": "game",
+    "scriptId": "tb",
+    "playerCount": 20,
+    "dist": {
+      "t": 13,
+      "o": 1,
+      "m": 5,
+      "d": 1
+    },
+    "names": [
+      "Seat01-AlexanderTheStorytellersLongRosterName",
+      "Seat02-AlexanderTheStorytellersLongRosterName",
+      "Seat03-AlexanderTheStorytellersLongRosterName",
+      "Seat04-AlexanderTheStorytellersLongRosterName",
+      "Seat05-AlexanderTheStorytellersLongRosterName",
+      "Seat06-AlexanderTheStorytellersLongRosterName",
+      "Seat07-AlexanderTheStorytellersLongRosterName",
+      "Seat08-AlexanderTheStorytellersLongRosterName",
+      "Seat09-AlexanderTheStorytellersLongRosterName",
+      "Seat10-AlexanderTheStorytellersLongRosterName",
+      "Seat11-AlexanderTheStorytellersLongRosterName",
+      "Seat12-AlexanderTheStorytellersLongRosterName",
+      "Seat13-AlexanderTheStorytellersLongRosterName",
+      "Seat14-AlexanderTheStorytellersLongRosterName",
+      "Seat15-AlexanderTheStorytellersLongRosterName",
+      "Seat16-AlexanderTheStorytellersLongRosterName",
+      "Seat17-AlexanderTheStorytellersLongRosterName",
+      "Seat18-AlexanderTheStorytellersLongRosterName",
+      "Seat19-AlexanderTheStorytellersLongRosterName",
+      "Seat20-AlexanderTheStorytellersLongRosterName"
+    ],
+    "rolePool": [
+      "washerwoman",
+      "librarian",
+      "investigator",
+      "chef",
+      "empath",
+      "fortuneteller",
+      "undertaker",
+      "monk",
+      "ravenkeeper",
+      "virgin",
+      "slayer",
+      "soldier",
+      "mayor",
+      "butler",
+      "poisoner",
+      "spy",
+      "scarletwoman",
+      "baron",
+      "poisoner",
+      "imp"
+    ],
+    "assignments": {
+      "0": "washerwoman",
+      "1": "librarian",
+      "2": "investigator",
+      "3": "chef",
+      "4": "empath",
+      "5": "fortuneteller",
+      "6": "undertaker",
+      "7": "monk",
+      "8": "ravenkeeper",
+      "9": "virgin",
+      "10": "slayer",
+      "11": "soldier",
+      "12": "mayor",
+      "13": "butler",
+      "14": "poisoner",
+      "15": "spy",
+      "16": "scarletwoman",
+      "17": "baron",
+      "18": "poisoner",
+      "19": "imp"
+    },
+    "drunkBelievedRoles": {
+      "13": "soldier"
+    },
+    "redHerringIndex": 5,
+    "roleEntryIndex": 20,
+    "revealIndex": 19,
+    "dayNum": 7,
+    "phase": "night",
+    "activeWakeIdx": 6,
+    "nightLog": [
+      {
+        "roleId": "poisoner",
+        "targetIndex": 1,
+        "actingPlayerIndex": 14,
+        "fakeNoEffect": false
+      },
+      {
+        "roleId": "monk",
+        "targetIndex": 0,
+        "actingPlayerIndex": 7,
+        "fakeNoEffect": false
+      }
+    ],
+    "alive": {
+      "0": true,
+      "1": true,
+      "2": true,
+      "3": true,
+      "4": true,
+      "5": true,
+      "6": true,
+      "7": true,
+      "8": true,
+      "9": true,
+      "10": true,
+      "11": true,
+      "12": true,
+      "13": true,
+      "14": true,
+      "15": true,
+      "16": false,
+      "17": false,
+      "18": false,
+      "19": false
+    },
+    "nominations": [],
+    "votes": {
+      "0": 1,
+      "1": 1,
+      "2": 1,
+      "3": 1,
+      "4": 1,
+      "5": 1,
+      "6": 1,
+      "7": 1,
+      "8": 1,
+      "9": 1,
+      "10": 1,
+      "11": 1,
+      "12": 1,
+      "13": 1,
+      "14": 1,
+      "15": 1,
+      "16": 0,
+      "17": 0,
+      "18": 0,
+      "19": 0
+    },
+    "ghostVotes": {
+      "0": false,
+      "1": false,
+      "2": false,
+      "3": false,
+      "4": false,
+      "5": false,
+      "6": false,
+      "7": false,
+      "8": false,
+      "9": false,
+      "10": false,
+      "11": false,
+      "12": false,
+      "13": false,
+      "14": false,
+      "15": false,
+      "16": true,
+      "17": false,
+      "18": true,
+      "19": false
+    },
+    "deathsLastNight": [],
+    "poisonedIndex": 1,
+    "chronicle": [
+      {
+        "type": "system",
+        "title": "Tragedy Begins",
+        "details": "20 players.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 1,
+        "title": "Poisoner Target",
+        "details": "Poisoned <strong>Seat04-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#8e44ad"
+      },
+      {
+        "type": "system",
+        "dayNum": 1,
+        "title": "Day 1 Rises",
+        "details": "The town wakes up to face Day 1.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 2,
+        "title": "Poisoner Target",
+        "details": "Poisoned <strong>Seat07-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#8e44ad"
+      },
+      {
+        "type": "night",
+        "nightNum": 2,
+        "title": "Demon Strike",
+        "details": "Demon targeted <strong>Seat12-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#951B1E"
+      },
+      {
+        "type": "night",
+        "nightNum": 2,
+        "title": "Monk Action",
+        "details": "Target chosen: <strong>Seat05-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 2,
+        "title": "Empath Action",
+        "details": "Target chosen: <strong>Seat06-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "system",
+        "dayNum": 2,
+        "title": "Day 2 Rises",
+        "details": "The town wakes up to face Day 2.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 3,
+        "title": "Poisoner Target",
+        "details": "Poisoned <strong>Seat10-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#8e44ad"
+      },
+      {
+        "type": "night",
+        "nightNum": 3,
+        "title": "Demon Strike",
+        "details": "Demon targeted <strong>Seat17-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#951B1E"
+      },
+      {
+        "type": "night",
+        "nightNum": 3,
+        "title": "Monk Action",
+        "details": "Target chosen: <strong>Seat06-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 3,
+        "title": "Empath Action",
+        "details": "Target chosen: <strong>Seat07-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "system",
+        "dayNum": 3,
+        "title": "Day 3 Rises",
+        "details": "The town wakes up to face Day 3.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 4,
+        "title": "Poisoner Target",
+        "details": "Poisoned <strong>Seat13-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#8e44ad"
+      },
+      {
+        "type": "night",
+        "nightNum": 4,
+        "title": "Demon Strike",
+        "details": "Demon targeted <strong>Seat02-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#951B1E"
+      },
+      {
+        "type": "night",
+        "nightNum": 4,
+        "title": "Monk Action",
+        "details": "Target chosen: <strong>Seat07-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 4,
+        "title": "Empath Action",
+        "details": "Target chosen: <strong>Seat08-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "system",
+        "dayNum": 4,
+        "title": "Day 4 Rises",
+        "details": "The town wakes up to face Day 4.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 5,
+        "title": "Poisoner Target",
+        "details": "Poisoned <strong>Seat16-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#8e44ad"
+      },
+      {
+        "type": "night",
+        "nightNum": 5,
+        "title": "Demon Strike",
+        "details": "Demon targeted <strong>Seat07-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#951B1E"
+      },
+      {
+        "type": "night",
+        "nightNum": 5,
+        "title": "Monk Action",
+        "details": "Target chosen: <strong>Seat08-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 5,
+        "title": "Empath Action",
+        "details": "Target chosen: <strong>Seat09-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "system",
+        "dayNum": 5,
+        "title": "Day 5 Rises",
+        "details": "The town wakes up to face Day 5.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 6,
+        "title": "Poisoner Target",
+        "details": "Poisoned <strong>Seat19-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#8e44ad"
+      },
+      {
+        "type": "night",
+        "nightNum": 6,
+        "title": "Demon Strike",
+        "details": "Demon targeted <strong>Seat12-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#951B1E"
+      },
+      {
+        "type": "night",
+        "nightNum": 6,
+        "title": "Monk Action",
+        "details": "Target chosen: <strong>Seat09-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 6,
+        "title": "Empath Action",
+        "details": "Target chosen: <strong>Seat10-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "system",
+        "dayNum": 6,
+        "title": "Day 6 Rises",
+        "details": "The town wakes up to face Day 6.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Poisoner Target",
+        "details": "Poisoned <strong>Seat02-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#8e44ad"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Demon Strike",
+        "details": "Demon targeted <strong>Seat17-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "#951B1E"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Monk Action",
+        "details": "Target chosen: <strong>Seat10-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Empath Action",
+        "details": "Target chosen: <strong>Seat11-AlexanderTheStorytellersLongRosterName</strong>.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "system",
+        "dayNum": 7,
+        "title": "Day 7 Rises",
+        "details": "The town wakes up to face Day 7.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 1",
+        "details": "Night 7 note 1: <strong>Seat01-AlexanderTheStorytellersLongRosterName</strong> claimed washerwoman while discussing seats 3 and 6. Unique token 0-0-Seat01-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 2",
+        "details": "Night 7 note 2: <strong>Seat02-AlexanderTheStorytellersLongRosterName</strong> claimed librarian while discussing seats 4 and 7. Unique token 1-1eef-Seat02-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 3",
+        "details": "Night 7 note 3: <strong>Seat03-AlexanderTheStorytellersLongRosterName</strong> claimed investigator while discussing seats 5 and 8. Unique token 2-3dde-Seat03-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 4",
+        "details": "Night 7 note 4: <strong>Seat04-AlexanderTheStorytellersLongRosterName</strong> claimed chef while discussing seats 6 and 9. Unique token 3-5ccd-Seat04-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 5",
+        "details": "Night 7 note 5: <strong>Seat05-AlexanderTheStorytellersLongRosterName</strong> claimed empath while discussing seats 7 and 10. Unique token 4-7bbc-Seat05-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 6",
+        "details": "Night 7 note 6: <strong>Seat06-AlexanderTheStorytellersLongRosterName</strong> claimed fortuneteller while discussing seats 8 and 11. Unique token 5-9aab-Seat06-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 7",
+        "details": "Night 7 note 7: <strong>Seat07-AlexanderTheStorytellersLongRosterName</strong> claimed undertaker while discussing seats 9 and 12. Unique token 6-b99a-Seat07-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 8",
+        "details": "Night 7 note 8: <strong>Seat08-AlexanderTheStorytellersLongRosterName</strong> claimed monk while discussing seats 10 and 13. Unique token 7-d889-Seat08-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 9",
+        "details": "Night 7 note 9: <strong>Seat09-AlexanderTheStorytellersLongRosterName</strong> claimed ravenkeeper while discussing seats 11 and 14. Unique token 8-f778-Seat09-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 10",
+        "details": "Night 7 note 10: <strong>Seat10-AlexanderTheStorytellersLongRosterName</strong> claimed virgin while discussing seats 12 and 15. Unique token 9-11667-Seat10-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 11",
+        "details": "Night 7 note 11: <strong>Seat11-AlexanderTheStorytellersLongRosterName</strong> claimed slayer while discussing seats 13 and 16. Unique token a-13556-Seat11-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 12",
+        "details": "Night 7 note 12: <strong>Seat12-AlexanderTheStorytellersLongRosterName</strong> claimed soldier while discussing seats 14 and 17. Unique token b-15445-Seat12-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 13",
+        "details": "Night 7 note 13: <strong>Seat13-AlexanderTheStorytellersLongRosterName</strong> claimed mayor while discussing seats 15 and 18. Unique token c-17334-Seat13-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 14",
+        "details": "Night 7 note 14: <strong>Seat14-AlexanderTheStorytellersLongRosterName</strong> claimed butler while discussing seats 16 and 19. Unique token d-19223-Seat14-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 15",
+        "details": "Night 7 note 15: <strong>Seat15-AlexanderTheStorytellersLongRosterName</strong> claimed poisoner while discussing seats 17 and 20. Unique token e-1b112-Seat15-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 16",
+        "details": "Night 7 note 16: <strong>Seat16-AlexanderTheStorytellersLongRosterName</strong> claimed spy while discussing seats 18 and 1. Unique token f-1d001-Seat16-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 17",
+        "details": "Night 7 note 17: <strong>Seat17-AlexanderTheStorytellersLongRosterName</strong> claimed scarletwoman while discussing seats 19 and 2. Unique token g-1eef0-Seat17-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 18",
+        "details": "Night 7 note 18: <strong>Seat18-AlexanderTheStorytellersLongRosterName</strong> claimed baron while discussing seats 20 and 3. Unique token h-20ddf-Seat18-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 19",
+        "details": "Night 7 note 19: <strong>Seat19-AlexanderTheStorytellersLongRosterName</strong> claimed poisoner while discussing seats 1 and 4. Unique token i-22cce-Seat19-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 20",
+        "details": "Night 7 note 20: <strong>Seat20-AlexanderTheStorytellersLongRosterName</strong> claimed imp while discussing seats 2 and 5. Unique token j-24bbd-Seat20-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 21",
+        "details": "Night 7 note 21: <strong>Seat01-AlexanderTheStorytellersLongRosterName</strong> claimed washerwoman while discussing seats 3 and 6. Unique token k-26aac-Seat01-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 22",
+        "details": "Night 7 note 22: <strong>Seat02-AlexanderTheStorytellersLongRosterName</strong> claimed librarian while discussing seats 4 and 7. Unique token l-2899b-Seat02-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 23",
+        "details": "Night 7 note 23: <strong>Seat03-AlexanderTheStorytellersLongRosterName</strong> claimed investigator while discussing seats 5 and 8. Unique token m-2a88a-Seat03-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 24",
+        "details": "Night 7 note 24: <strong>Seat04-AlexanderTheStorytellersLongRosterName</strong> claimed chef while discussing seats 6 and 9. Unique token n-2c779-Seat04-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 25",
+        "details": "Night 7 note 25: <strong>Seat05-AlexanderTheStorytellersLongRosterName</strong> claimed empath while discussing seats 7 and 10. Unique token o-2e668-Seat05-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 26",
+        "details": "Night 7 note 26: <strong>Seat06-AlexanderTheStorytellersLongRosterName</strong> claimed fortuneteller while discussing seats 8 and 11. Unique token p-30557-Seat06-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 27",
+        "details": "Night 7 note 27: <strong>Seat07-AlexanderTheStorytellersLongRosterName</strong> claimed undertaker while discussing seats 9 and 12. Unique token q-32446-Seat07-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 28",
+        "details": "Night 7 note 28: <strong>Seat08-AlexanderTheStorytellersLongRosterName</strong> claimed monk while discussing seats 10 and 13. Unique token r-34335-Seat08-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 29",
+        "details": "Night 7 note 29: <strong>Seat09-AlexanderTheStorytellersLongRosterName</strong> claimed ravenkeeper while discussing seats 11 and 14. Unique token s-36224-Seat09-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 30",
+        "details": "Night 7 note 30: <strong>Seat10-AlexanderTheStorytellersLongRosterName</strong> claimed virgin while discussing seats 12 and 15. Unique token t-38113-Seat10-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 31",
+        "details": "Night 7 note 31: <strong>Seat11-AlexanderTheStorytellersLongRosterName</strong> claimed slayer while discussing seats 13 and 16. Unique token u-3a002-Seat11-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      },
+      {
+        "type": "night",
+        "nightNum": 7,
+        "title": "Private chat 32",
+        "details": "Night 7 note 32: <strong>Seat12-AlexanderTheStorytellersLongRosterName</strong> claimed soldier while discussing seats 14 and 17. Unique token v-3bef1-Seat12-AlexanderTheStorytellersLongRosterName.",
+        "badgeColor": "var(--border)"
+      }
+    ],
+    "winTeam": null,
+    "winnerSelection": [],
+    "timerSeconds": 240,
+    "timerTotal": 300,
+    "tab": "night"
+  }
+}

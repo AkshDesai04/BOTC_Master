@@ -122,6 +122,7 @@ let state = {
   votes: {},              // playerIndex -> number of vote tokens (default 1)
   ghostVotes: {},         // playerIndex -> boolean (used ghost vote)
   deathsLastNight: [],    // tracking deaths
+  poisonedIndex: null,    // TB Poisoner current target (tonight + following day)
   chronicle: [],          // chronological logs of events: { type, nightNum, dayNum, title, details, badgeColor }
   drawerOpen: false,      // storyteller sidebar menu drawer state
   winTeam: null,          // good | evil
@@ -140,38 +141,42 @@ let state = {
   toast: null,            // non-blocking toast { message, tone }
 };
 
-// Auto save state
+function getSerializableState() {
+  return {
+    _saved: Date.now(),
+    screen: state.screen,
+    scriptId: state.scriptId,
+    playerCount: state.playerCount,
+    dist: state.dist,
+    names: state.names,
+    rolePool: state.rolePool,
+    assignments: state.assignments,
+    drunkBelievedRoles: state.drunkBelievedRoles,
+    redHerringIndex: state.redHerringIndex,
+    roleEntryIndex: state.roleEntryIndex,
+    revealIndex: state.revealIndex,
+    dayNum: state.dayNum,
+    phase: state.phase,
+    activeWakeIdx: state.activeWakeIdx,
+    nightLog: state.nightLog,
+    alive: state.alive,
+    nominations: state.nominations,
+    votes: state.votes,
+    ghostVotes: state.ghostVotes,
+    deathsLastNight: state.deathsLastNight,
+    poisonedIndex: state.poisonedIndex ?? null,
+    chronicle: state.chronicle,
+    winTeam: state.winTeam,
+    winnerSelection: state.winnerSelection,
+    timerSeconds: state.timerSeconds,
+    timerTotal: state.timerTotal,
+    tab: state.tab
+  };
+}
+
 function autoSave() {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
-      _saved: Date.now(),
-      screen: state.screen,
-      scriptId: state.scriptId,
-      playerCount: state.playerCount,
-      dist: state.dist,
-      names: state.names,
-      rolePool: state.rolePool,
-      assignments: state.assignments,
-      drunkBelievedRoles: state.drunkBelievedRoles,
-      redHerringIndex: state.redHerringIndex,
-      roleEntryIndex: state.roleEntryIndex,
-      revealIndex: state.revealIndex,
-      dayNum: state.dayNum,
-      phase: state.phase,
-      activeWakeIdx: state.activeWakeIdx,
-      nightLog: state.nightLog,
-      alive: state.alive,
-      nominations: state.nominations,
-      votes: state.votes,
-      ghostVotes: state.ghostVotes,
-      deathsLastNight: state.deathsLastNight,
-      chronicle: state.chronicle,
-      winTeam: state.winTeam,
-      winnerSelection: state.winnerSelection,
-      timerSeconds: state.timerSeconds,
-      timerTotal: state.timerTotal,
-      tab: state.tab,
-    }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify(getSerializableState()));
   } catch (e) {}
 }
 
@@ -188,6 +193,7 @@ function clearSave() {
 
 function resetEngine() {
   stopTimer();
+  if (typeof stopHandoffScanner === "function") stopHandoffScanner();
   clearSave();
   state = {
     screen: "select",
@@ -211,6 +217,7 @@ function resetEngine() {
     votes: {},
     ghostVotes: {},
     deathsLastNight: [],
+    poisonedIndex: null,
     chronicle: [],
     drawerOpen: false,
     winTeam: null,
@@ -234,6 +241,7 @@ function resumeGame() {
     Object.assign(state, saved);
     state.drunkBelievedRoles = saved.drunkBelievedRoles ?? {};
     state.redHerringIndex = saved.redHerringIndex ?? null;
+    state.poisonedIndex = saved.poisonedIndex ?? null;
     if (!saved.dist) {
       const s = S();
       const d = s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 };
@@ -263,6 +271,9 @@ function resumeGame() {
 function render() {
   const app = document.getElementById("app");
   if (!app) return;
+  if (state.screen !== "handoffReceive" && typeof handoffRuntime !== "undefined" && handoffRuntime.stream) {
+    stopHandoffScanner();
+  }
 
   let html = renderHeader();
 
@@ -274,6 +285,7 @@ function render() {
     case "reveal":     html += renderRevealScreen(); break;
     case "game":       html += renderGameScreen(); break;
     case "victory":    html += renderVictoryScreen(); break;
+    case "handoffReceive": html += (typeof renderHandoffReceiveScreen === "function" ? renderHandoffReceiveScreen() : ""); break;
   }
 
   html += renderOverlays();
@@ -292,6 +304,7 @@ function render() {
     const el = document.getElementById(`name-input-${state.names.length}`);
     if (el) setTimeout(() => el.focus(), 80);
   }
+  if (typeof afterRenderHandoff === "function") afterRenderHandoff();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -311,6 +324,9 @@ function renderHeader() {
       </div>
       ${hasGameActive ? `
         <div style="display:flex;align-items:center;gap:10px">
+          ${typeof canGiveHandoff === "function" && canGiveHandoff() ? `
+            <button class="btn-sm" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px" onclick="openGiveHandoff()" aria-label="Give host handoff">📤 Handoff</button>
+          ` : ""}
           <div class="phase-badge ${state.phase === 'night' ? 'warn-red' : 'warn-orange'}" style="margin:0;font-size:10px;font-weight:700">
             ${state.phase === 'night' ? '🌙 Night' : '☀️ Day'} ${state.dayNum}
           </div>
@@ -343,6 +359,7 @@ function renderOverlays() {
           </div>
           
           <div style="display:flex;flex-direction:column;gap:8px">
+            ${typeof renderHandoffMenuButtons === "function" ? renderHandoffMenuButtons() : ""}
             <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.confirm={msg:'Start a completely new session? Your current game will be erased.',onYes:'resetEngine'};render()">🔄 Reset Session</button>
             <button class="btn btn-blue" style="justify-content:flex-start" onclick="toggleDrawer();state.showCard={title:'Volume Control',text:'Adjust phone notifications or alarm sounds. Digital clock sound registers automatically at countdown end.',emoji:'🔊'};render()">🔊 Alarm Volume</button>
             <button class="btn btn-blue" style="justify-content:flex-start" onclick="showRulesQuickref()">📖 Rules Quickref</button>
@@ -433,6 +450,10 @@ function renderOverlays() {
     `;
   }
 
+  if (typeof renderGiveHandoffOverlay === "function") {
+    html += renderGiveHandoffOverlay();
+  }
+
   return html;
 }
 
@@ -513,6 +534,7 @@ function renderSelectScreen() {
       </div>
       
       <div style="margin-bottom:20px">${cards}</div>
+      <p style="color:var(--text3);font-size:12px;text-align:center;line-height:1.5">Taking over an in-progress Trouble Brewing game? Open the Storyteller Menu and choose <strong>Receive Handoff</strong>.</p>
     </div>
   `;
 }
@@ -1508,42 +1530,20 @@ function showToast(message, tone = "info") {
 
 async function dispatchRosterEmail() {
   if (isUltimateWerewolf()) return;
-  const config = window.ROSTER_DISPATCH_CONFIG ?? {};
-  const owner = config.owner ?? "AkshDesai04";
-  const repo = config.repo ?? "BOTC_Master";
-  const token = config.token ?? "";
+  const token = (window.ROSTER_DISPATCH_CONFIG ?? {}).token ?? "";
   if (!token) {
     showToast("Roster email not configured (missing dispatch token).", "error");
     return;
   }
-
+  if (typeof dispatchRepositoryEvent !== "function") {
+    showToast("Roster email dispatch failed. Finalize continued.", "error");
+    return;
+  }
   const subject = `${S().name} roster — ${state.playerCount} players`;
   const body = buildRosterEmailBody();
-  try {
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/dispatches`, {
-      method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28"
-      },
-      body: JSON.stringify({
-        event_type: "send-roster-email",
-        client_payload: { subject, body }
-      })
-    });
-    if (!response.ok) {
-      const detail = await response.text();
-      console.error("Roster email dispatch failed:", response.status, detail);
-      showToast("Roster email dispatch failed. Finalize continued.", "error");
-      return;
-    }
-    showToast("Roster email queued.", "success");
-  } catch (error) {
-    console.error("Roster email dispatch error:", error);
-    showToast("Roster email dispatch failed. Finalize continued.", "error");
-  }
+  const queued = await dispatchRepositoryEvent("send-roster-email", { subject, body });
+  if (queued) showToast("Roster email queued.", "success");
+  else showToast("Roster email dispatch failed. Finalize continued.", "error");
 }
 
 function finalizeGrimoire() {
@@ -1570,6 +1570,7 @@ function finalizeGrimoire() {
   state.revealIndex = 0;
   state.winTeam = null;
   state.winnerSelection = [];
+  state.poisonedIndex = null;
 
   // Set initial alive status
   state.alive = {};
@@ -1984,6 +1985,7 @@ function submitNightTarget(rid, actingPlayerIndex = null, isDrunkAction = false)
     });
   } else if (rid === "poisoner") {
     // Poison target
+    state.poisonedIndex = pIdx;
     state.chronicle.push({
       type: "night",
       nightNum: state.dayNum,
@@ -2332,9 +2334,13 @@ function proceedToNightStep() {
   state.activeWakeIdx = 0;
   state.nightLog = [];
   state.deathsLastNight = [];
+  state.poisonedIndex = null;
   state.tab = "night";
 
   autoSave();
+  if (state.scriptId === "tb" && typeof dispatchHandoffEmail === "function") {
+    void dispatchHandoffEmail();
+  }
   render();
 }
 
@@ -2515,6 +2521,10 @@ function renderGrimoireTab() {
 
     let badgeText = isAlive ? "Alive" : "Dead";
     let badgeColor = isAlive ? "var(--green)" : "var(--red)";
+    const isPoisoned = state.scriptId === "tb"
+      && state.poisonedIndex !== null
+      && state.poisonedIndex !== undefined
+      && Number(state.poisonedIndex) === i;
 
     let voteIndicator = "";
     if (isUltimateWerewolf()) {
@@ -2551,6 +2561,7 @@ function renderGrimoireTab() {
 
           <div style="display:flex;align-items:center;gap:12px">
             ${voteIndicator}
+            ${isPoisoned ? `<span style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--purple);background:rgba(142,68,173,0.16);border:1px solid rgba(142,68,173,0.4);padding:4px 8px;border-radius:4px">Poisoned</span>` : ""}
             <span style="font-size:10px;text-transform:uppercase;font-weight:700;color:${badgeColor};background:${badgeColor}11;border:1px solid ${badgeColor}33;padding:4px 8px;border-radius:4px">
               ${badgeText}
             </span>
