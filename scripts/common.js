@@ -617,7 +617,16 @@ function renderCountScreen() {
       </div>
       `}
 
-      <button class="btn btn-primary" ${mismatch ? 'style="opacity:0.5;pointer-events:none"' : ''} onclick="proceedToNames()">Proceed to Player Roster →</button>
+      <div class="card" style="padding:16px;border-radius:12px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Import Players</div>
+        <p style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px">Upload a CSV, TXT, PNG, JPG, or JPEG with the guest list. Names are extracted and loaded into the Player Roster.</p>
+        <input type="file" id="player-import-file" accept=".csv,.txt,.png,.jpg,.jpeg,text/csv,text/plain,image/png,image/jpeg" style="display:none" onchange="handlePlayerImportFile(event)">
+        <button type="button" class="btn-outline" style="width:100%" id="player-import-btn" onclick="document.getElementById('player-import-file').click()" ${state.playerImportBusy ? "disabled" : ""}>
+          ${state.playerImportBusy ? "Importing names…" : "📄 Import from file"}
+        </button>
+      </div>
+
+      <button class="btn btn-primary" ${mismatch || state.playerImportBusy ? 'style="opacity:0.5;pointer-events:none"' : ''} onclick="proceedToNames()">Proceed to Player Roster →</button>
       <button class="btn-outline" style="margin-top:10px;width:100%" onclick="state.screen='select';render()">← Back to Scripts</button>
     </div>
   `;
@@ -656,6 +665,232 @@ function proceedToNames() {
   state.screen = "names";
   autoSave();
   render();
+}
+
+const PLAYER_IMPORT_MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-2.5-flash-lite",
+  "gemma-4-31b-it"
+];
+
+const PLAYER_IMPORT_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    names: {
+      type: "array",
+      description: "Ordered list of distinct player display names extracted from the upload.",
+      items: { type: "string" }
+    }
+  },
+  required: ["names"]
+};
+
+function getGeminiApiKey() {
+  return String(window.ROSTER_DISPATCH_CONFIG?.geminiApiKey ?? "").trim();
+}
+
+function playerImportPrompt() {
+  return [
+    "Extract every person name from the attached guest list file.",
+    "Return only JSON matching this structure exactly:",
+    '{"names":["Name One","Name Two"]}',
+    "Rules:",
+    "- names must be an array of strings in the same order as the source when possible.",
+    "- Use each person's display name only; strip seat numbers, emails, phones, roles, and headings.",
+    "- Skip blank lines, duplicates (keep first), and non-person labels.",
+    "- Do not include explanations, markdown, or any keys other than names."
+  ].join("\n");
+}
+
+function thinkingConfigForModel(modelId) {
+  if (modelId.startsWith("gemini-3")) {
+    return { thinkingLevel: "minimal", includeThoughts: false };
+  }
+  return { thinkingBudget: 0, includeThoughts: false };
+}
+
+function extensionOfFileName(fileName) {
+  const parts = String(fileName ?? "").toLowerCase().split(".");
+  return parts.length > 1 ? parts[parts.length - 1] : "";
+}
+
+function resolvePlayerImportMime(file) {
+  const ext = extensionOfFileName(file?.name);
+  if (ext === "csv") return "text/csv";
+  if (ext === "txt") return "text/plain";
+  if (ext === "png") return "image/png";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (file?.type) return file.type;
+  return "";
+}
+
+function isAllowedPlayerImportFile(file) {
+  const ext = extensionOfFileName(file?.name);
+  return ["csv", "txt", "png", "jpg", "jpeg"].includes(ext);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file."));
+    reader.readAsText(file);
+  });
+}
+
+async function buildPlayerImportParts(file) {
+  const mime = resolvePlayerImportMime(file);
+  const promptText = playerImportPrompt();
+  if (mime.startsWith("image/")) {
+    const dataUrl = await readFileAsDataUrl(file);
+    const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
+    return [
+      { text: promptText },
+      { inlineData: { mimeType: mime, data: base64 } }
+    ];
+  }
+  const text = await readFileAsText(file);
+  return [{ text: `${promptText}\n\nFILE_NAME: ${file.name}\nFILE_CONTENTS:\n${text}` }];
+}
+
+function parsePlayerImportPayload(rawText) {
+  const trimmed = String(rawText ?? "").trim();
+  if (!trimmed) throw new Error("Empty model response.");
+  let parsed;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("Model did not return JSON.");
+    parsed = JSON.parse(match[0]);
+  }
+  if (!parsed || !Array.isArray(parsed.names)) {
+    throw new Error("JSON missing names array.");
+  }
+  const seen = new Set();
+  const names = [];
+  for (const entry of parsed.names) {
+    const name = String(entry ?? "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
+async function callGeminiForPlayerNames(modelId, parts, apiKey) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const generationConfig = {
+    temperature: 0,
+    responseMimeType: "application/json",
+    responseSchema: PLAYER_IMPORT_RESPONSE_SCHEMA
+  };
+  // Disable / minimize model reasoning. Gemma may reject thinkingConfig — omit it there.
+  if (!modelId.startsWith("gemma-")) {
+    generationConfig.thinkingConfig = thinkingConfigForModel(modelId);
+  }
+  const body = {
+    contents: [{ role: "user", parts }],
+    generationConfig
+  };
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload?.error?.message || `HTTP ${response.status}`;
+    throw new Error(`${modelId}: ${message}`);
+  }
+  const text = payload?.candidates?.[0]?.content?.parts
+    ?.map(part => part?.text ?? "")
+    .join("")
+    .trim();
+  return parsePlayerImportPayload(text);
+}
+
+async function extractPlayerNamesWithGemini(file) {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error("Gemini API key is not configured on this deploy.");
+  }
+  const parts = await buildPlayerImportParts(file);
+  let lastError = null;
+  for (const modelId of PLAYER_IMPORT_MODELS) {
+    try {
+      return await callGeminiForPlayerNames(modelId, parts, apiKey);
+    } catch (error) {
+      lastError = error;
+      console.warn("Player import model failed:", modelId, error);
+    }
+  }
+  throw lastError ?? new Error("All Gemini models failed.");
+}
+
+function applyImportedPlayerNames(names) {
+  const s = S();
+  const minimumPlayers = s.playerLimits?.min ?? 5;
+  const maximumPlayers = s.playerLimits?.max ?? 20;
+  if (names.length < minimumPlayers) {
+    showToast(`Need at least ${minimumPlayers} names (found ${names.length}).`, "error");
+    render();
+    return false;
+  }
+  let imported = names;
+  if (names.length > maximumPlayers) {
+    imported = names.slice(0, maximumPlayers);
+    showToast(`Imported first ${maximumPlayers} of ${names.length} names (script max).`, "info");
+  } else {
+    showToast(`Imported ${imported.length} players into the roster.`, "success");
+  }
+  state.playerCount = imported.length;
+  if (s.setupMode !== "physical-cards") {
+    state.dist = { ...(s.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 }) };
+  }
+  state.names = [...imported];
+  state.screen = "names";
+  autoSave();
+  render();
+  return true;
+}
+
+async function handlePlayerImportFile(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+  if (input) input.value = "";
+  if (!file) return;
+  if (!isAllowedPlayerImportFile(file)) {
+    showToast("Use a CSV, TXT, PNG, JPG, or JPEG file.", "error");
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    showToast("File is too large (max 8 MB).", "error");
+    return;
+  }
+  state.playerImportBusy = true;
+  render();
+  try {
+    const names = await extractPlayerNamesWithGemini(file);
+    state.playerImportBusy = false;
+    applyImportedPlayerNames(names);
+  } catch (error) {
+    console.error("Player import failed:", error);
+    showToast(error?.message ? `Import failed: ${error.message}` : "Import failed.", "error");
+    state.playerImportBusy = false;
+    render();
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
