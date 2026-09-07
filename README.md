@@ -68,6 +68,9 @@ A moderator-led physical-card mode for 5–75 recorded seats. The app does not c
 - Let the operator manually declare good/evil victory in Blood on the Clocktower.
 - Let the moderator manually select one or more team and eligible individual winners in Ultimate Werewolf.
 - Save the current session in the browser and offer to resume it after reload.
+- After Trouble Brewing Night 1 ends, let the Storyteller give a host handoff QR that contains the live session JSON (players, roles, night steps, poison, chronicle, and related state). Handoff remains available during later days and in the middle of later nights.
+- Let a receiving device restore that session from the landing-page Storyteller Menu using the camera, a QR image, or pasted JSON.
+- Email a handoff QR after each Trouble Brewing day ends, using the same roster-email dispatch path.
 
 ### The app does not
 
@@ -99,7 +102,11 @@ Night prompts and role text are references. Pressing **Submit** records one sele
    - **Night Sequence** for the configured wake order and action log.
    - **Town Square** for morning announcements and the discussion timer.
    - **Chronicle** for recorded setup, targets, status changes, day transitions, and declared winners.
-7. Use the menu for the short rules reference or to reset the session. Resetting clears the saved game.
+7. Use the menu for the short rules reference, to reset the session, or to transfer a live Trouble Brewing game.
+   - **Give Handoff** appears after Night 1 ends. It shows a QR of the current session JSON so another device can take over, including mid-night.
+   - **Receive Handoff** is on the landing-page Storyteller Menu. Scan or upload the QR (or paste JSON) to replace this browser's saved session with the transferred game.
+8. After each day, when the Storyteller proceeds to the next night, a handoff QR is emailed as a backup when dispatch is configured.
+9. Resetting clears the saved game.
 
 Keep the device screen hidden whenever it displays the complete Grimoire, role assignments, night prompts, or chronicle.
 
@@ -430,13 +437,14 @@ White Wolf and Lone Wolf are grouped with the Werewolf team above but are also a
 ## Persistence and privacy
 
 - Session state is serialized as JSON in the current browser's `localStorage` under `botc_storyteller_v2`.
-- Saved data includes player names, script, distribution, assignments, alive/dead status, night targets, chronicle entries, timer values, and declared winners.
+- Saved data includes player names, script, distribution, assignments, alive/dead status, night targets, chronicle entries, timer values, declared winners, and the current Trouble Brewing Poisoner target.
 - Trouble Brewing saves also include each Drunk seat's believed Townsfolk and the Fortune Teller Red Herring. Older saves without these fields load with safe empty defaults; an active legacy Drunk game returns to role setup so the Storyteller can make the required secret choice.
 - Reloading the main page offers to resume a saved session.
 - The timer is paused after a resumed reload for safety.
 - **Reset Session** and **Reset & New Game** remove the saved session.
-- There is no application server, account system, analytics code, network API, cloud synchronization, or cross-device transfer in this repository.
-- Data therefore stays in that browser storage unless the hosting environment, browser extensions, developer tools, device backups, or browser synchronization expose or copy it.
+- Trouble Brewing host handoff copies that same JSON onto a QR code so another device can load it. After each day ends, the app can also email that QR through the existing GitHub Actions mail dispatch.
+- There is no application server, account system, or analytics code. Roster and handoff emails use a configured GitHub repository_dispatch token when present.
+- Data therefore stays in that browser storage unless the host transfers it by QR/JSON, email dispatch is configured, or the hosting environment, browser extensions, developer tools, device backups, or browser synchronization expose or copy it.
 - Anyone using the same browser profile can potentially inspect the stored JSON. Do not enter sensitive personal information, and clear the session on shared devices.
 
 ## Running locally
@@ -482,7 +490,9 @@ The project is a small global-script single-page application:
 │   ├── bad_moon_rising.js          # BMR roles, distribution, travellers, night order
 │   ├── sects_and_violets.js        # S&V roles, distribution, travellers, night order
 │   ├── ultimate_werewolf.js        # UW roles, inventory, mode rules, night order
-│   └── common.js                   # State, persistence, event handlers, and rendering
+│   ├── handoff-qr.js               # Byte-mode QR encoder for host handoff
+│   ├── common.js                   # State, persistence, event handlers, and rendering
+│   └── handoff.js                  # Give/receive host handoff and day-end QR email
 ├── styles/
 │   └── main.css                    # Responsive visual design
 └── assets/
@@ -505,9 +515,9 @@ Each character supplies an ID, display name, category/type, team, ability text, 
 
 ### Rendering and state
 
-`scripts/common.js` owns a single mutable `state` object and renders HTML strings into `#app`. Inline event handlers call global functions, mutate state, save relevant changes, and render again. The main screens are script selection, count, roster, role setup, private reveal, active game, and victory. Active-game tabs render the Grimoire, night sequence, day brief/timer, and chronicle.
+`scripts/common.js` owns a single mutable `state` object and renders HTML strings into `#app`. Inline event handlers call global functions, mutate state, save relevant changes, and render again. The main screens are script selection, count, roster, role setup, private reveal, active game, host-handoff receive, and victory. Active-game tabs render the Grimoire, night sequence, day brief/timer, and chronicle.
 
-Load order matters: all four game-data scripts must execute before `common.js`.
+Load order matters: all four game-data scripts must execute before `common.js`. `handoff-qr.js` may load before `common.js`; `handoff.js` must load after it.
 
 ## Artwork
 
@@ -530,6 +540,9 @@ There is no automated compatibility matrix. The source requires a modern browser
 - `Object.fromEntries`, `Object.entries`, `Set`, and standard array methods.
 - DOM APIs and inline event-handler support.
 - `localStorage` for save/resume behavior.
+- `BarcodeDetector` for camera and image QR scanning (Chromium and recent Safari). JSON paste/upload remains available when that API is missing.
+- `getUserMedia` for the receive-handoff camera, which requires a secure context (HTTPS or localhost).
+- `CompressionStream` / `DecompressionStream` to pack large handoff payloads; uncompressed JSON is used when those APIs are missing.
 - Web Audio (`AudioContext` or `webkitAudioContext`) for the timer alarm.
 - CSS custom properties, Grid/Flexbox, animations, and `backdrop-filter` for the intended presentation.
 
@@ -552,8 +565,11 @@ Current Chromium, Firefox, and Safari-family browsers are reasonable targets bas
 - Ultimate Werewolf night prompts accept one generic living target even when an ability needs no target, multiple targets, an adjacent target, a role/team choice, or a non-target response.
 - Manual resurrection is available even when no role permits it.
 - The chronicle records selected actions and manual status changes, not a complete audit of everything that occurred.
-- Saved sessions have no schema version migration or import/export flow.
-- Some older standalone/reference files remain in the repository; [`index.html`](index.html) plus the five active scripts and main stylesheet are authoritative for current behavior.
+- Saved sessions have no general schema-version migration. Trouble Brewing host handoff is a QR/JSON export of the current save; it is not implemented for other scripts.
+- Give Handoff stays locked until Night 1 has ended. First-night setup cannot be transferred this way.
+- Camera QR scanning depends on `BarcodeDetector`. Firefox and some older browsers should use JSON paste/upload, or Chrome/Edge/Safari.
+- Dense late-game QRs can be hard to scan; copy JSON or the emailed QR image if the on-screen code fails.
+- Some older standalone/reference files remain in the repository; [`index.html`](index.html) plus the active scripts and main stylesheet are authoritative for current behavior.
 
 ## Contributing
 
@@ -570,7 +586,7 @@ If documentation or UI says an effect occurs automatically, add and test the cor
 
 ### Preserve compatibility
 
-- Keep `index.html` script order: game data first, shared engine last.
+- Keep `index.html` script order: game data, `handoff-qr.js`, `common.js`, then `handoff.js`.
 - Keep static hosting and relative paths working.
 - Consider existing saves before renaming IDs or changing state shapes.
 - Test with missing artwork so emoji fallbacks still work.
@@ -588,5 +604,6 @@ If documentation or UI says an effect occurs automatically, add and test the cor
 8. Declare winners and inspect the chronicle.
 9. Reload, resume, then reset and confirm the saved session is removed.
 10. Test both with and without role image files.
+11. For Trouble Brewing, finish Night 1, open Give Handoff, then restore that QR or JSON through Receive Handoff on a clean session. Confirm mid-night wake progress and poison restore. Confirm Give Handoff is unavailable during Night 1.
 
 When changing role data, compare the README role lists against every key in `TB_C`, `BMR_C`, `SV_C`, and `UW_C`, and compare Traveller sections against each `TRAVELLERS` object.

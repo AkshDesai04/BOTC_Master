@@ -2,7 +2,7 @@ name: Send roster email
 
 on:
   repository_dispatch:
-    types: [send-roster-email]
+    types: [send-roster-email, send-handoff-email]
 
 jobs:
   send-email:
@@ -13,19 +13,20 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install nodemailer
-        run: npm install nodemailer@6
+      - name: Install mail and QR libraries
+        run: npm install nodemailer@6 qrcode@1.5.4
 
-      - name: Send roster email via SMTP
+      - name: Send email via SMTP
         env:
           SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
           SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          MAIL_SUBJECT: ${{ github.event.client_payload.subject }}
-          MAIL_BODY: ${{ github.event.client_payload.body }}
         run: |
           node <<'EOF'
+          const fs = require('fs');
           const nodemailer = require('nodemailer');
+          const QRCode = require('qrcode');
+
           const smtpEmail = process.env.SMTP_EMAIL;
           const smtpPassword = (process.env.SMTP_APP_PASSWORD || '').replace(/\s+/g, '');
           const emailTo = (process.env.EMAIL_TO || '').trim();
@@ -37,9 +38,40 @@ jobs:
             console.error('EMAIL_TO secret is required (comma-separated recipient addresses).');
             process.exit(1);
           }
-          const subject = process.env.MAIL_SUBJECT || 'BOTC roster';
-          const body = process.env.MAIL_BODY || '';
+
+          const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          const payload = event.client_payload || {};
+          const subject = payload.subject || 'BOTC roster';
+          const body = payload.body || '';
+          const handoffParts = Array.isArray(payload.handoffParts)
+            ? payload.handoffParts.filter(part => typeof part === 'string' && part.length > 0)
+            : (typeof payload.handoff === 'string' && payload.handoff ? [payload.handoff] : []);
+
           (async () => {
+            const attachments = [];
+            for (let i = 0; i < handoffParts.length; i++) {
+              const part = handoffParts[i];
+              try {
+                const png = await QRCode.toBuffer(part, {
+                  errorCorrectionLevel: 'L',
+                  type: 'png',
+                  margin: 1,
+                  width: 512
+                });
+                attachments.push({
+                  filename: handoffParts.length === 1 ? 'botc-handoff-qr.png' : `botc-handoff-qr-${i + 1}.png`,
+                  content: png,
+                  cid: `handoff-qr-${i + 1}`
+                });
+              } catch (error) {
+                console.error('QR generation failed for part', i + 1, error);
+              }
+              attachments.push({
+                filename: handoffParts.length === 1 ? 'botc-handoff.txt' : `botc-handoff-part-${i + 1}.txt`,
+                content: part
+              });
+            }
+
             const transporter = nodemailer.createTransport({
               service: 'gmail',
               auth: {
@@ -47,13 +79,26 @@ jobs:
                 pass: smtpPassword
               }
             });
+
+            const htmlImages = attachments
+              .filter(item => item.filename.endsWith('.png'))
+              .map(item => `<p><img src="cid:${item.cid}" alt="Handoff QR" style="max-width:320px;height:auto;background:#fff;padding:8px" /></p>`)
+              .join('');
+            const escapedBody = String(body)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/\n/g, '<br>');
+
             await transporter.sendMail({
               from: smtpEmail,
               to: emailTo,
               subject,
-              text: body
+              text: body,
+              html: htmlImages ? `${escapedBody}${htmlImages}` : undefined,
+              attachments
             });
-            console.log('Roster email sent to:', emailTo);
+            console.log('Email sent to:', emailTo, 'attachments:', attachments.length);
           })().catch((error) => {
             console.error(error);
             process.exit(1);
