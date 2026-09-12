@@ -149,7 +149,9 @@
 
     const assignmentCounts = countValues(assignedRoleIds);
     const poolCounts = countValues(Array.isArray(rolePool) ? rolePool : []);
-    const maximumRoleUses = role => options.allowDuplicateRoles === true ? Number.POSITIVE_INFINITY : roleLimit(role);
+    const maximumRoleUses = role => options.allowAdditionalMinionCopy === true && role?.type === "minion"
+      ? Math.max(2, roleLimit(role))
+      : roleLimit(role);
     for (const [roleId, count] of assignmentCounts) {
       const role = characters?.[roleId];
       if (role && count > maximumRoleUses(role)) {

@@ -29,8 +29,7 @@
   try {
     const saved = loadFromStorage();
     if (saved && saved._saved) {
-      hydrateState(saved);
-      state.showResume = true;
+      if (hydrateState(saved) !== false) state.showResume = true;
     } else {
       const requestedScript = new URLSearchParams(window.location.search).get("script");
       if (["tb", "bmr", "sv"].includes(requestedScript)) {

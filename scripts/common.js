@@ -86,6 +86,7 @@ function stripLeadingIcon(value) {
 }
 
 function goToScreen(screen) {
+  if (state.screen === "count" && screen !== "count") rosterImportOperation++;
   state.screen = screen;
   autoSave();
   render();
@@ -135,6 +136,7 @@ const DEFAULT_DISCUSSION_TIMER_SECONDS = 300;
 const MIN_DISCUSSION_TIMER_SECONDS = 30;
 const MAX_DISCUSSION_TIMER_SECONDS = 3600;
 
+let rosterImportOperation = 0;
 let state = {
   screen: "select",       // select | count | names | roles | reveal | game | victory
   scriptId: null,         // tb | bmr | sv
@@ -428,6 +430,10 @@ function normalizeDiscussionTimerState({ migrateLegacyTimer = false } = {}) {
 }
 
 function hydrateState(saved) {
+  if (!["tb", "bmr", "sv"].includes(saved?.scriptId)) {
+    resetEngine();
+    return false;
+  }
   const hasDiscussionTimerState = Object.prototype.hasOwnProperty.call(saved, "discussionTimerDefaults")
     || Object.prototype.hasOwnProperty.call(saved, "discussionTimerSessions");
   Object.assign(state, saved);
@@ -494,9 +500,11 @@ function hydrateState(saved) {
   state.timerIntervalId = null;
   state.timerDeadline = null;
   normalizeDiscussionTimerState({ migrateLegacyTimer: !hasDiscussionTimerState });
+  return true;
 }
 
 function resetEngine() {
+  rosterImportOperation++;
   stopTimer();
   if (typeof stopHandoffScanner === "function") stopHandoffScanner();
   clearSave();
@@ -1007,6 +1015,7 @@ function renderSelectScreen() {
 
 function pickScript(id) {
   if (!["tb", "bmr", "sv"].includes(id)) return;
+  rosterImportOperation++;
   const changedScript = state.scriptId && state.scriptId !== id;
   state.scriptId = id;
   state.screen = "count";
@@ -1368,7 +1377,10 @@ function proceedToRoles() {
   const townsfolkCount = adjustedDistribution.t;
   const outsiderCount = adjustedDistribution.o;
   const chosenTF = chooseRoleCopies(tfKeys, townsfolkCount);
-  const chosenOS = chooseRoleCopies(osKeys, outsiderCount);
+  const eligibleOutsiders = state.playerCount >= 19 && state.scriptId === "tb"
+    ? osKeys.filter(roleId => roleId !== "drunk")
+    : osKeys;
+  const chosenOS = chooseRoleCopies(eligibleOutsiders, outsiderCount);
 
   state.rolePool = [...chosenTF, ...chosenOS, ...chosenMN, ...chosenDM];
   
@@ -1674,6 +1686,7 @@ function normalizeImportedNames(values) {
   const seen = new Set();
   return values.reduce((names, value) => {
     const name = String(value ?? "")
+      .replace(/[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]/g, "")
       .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "")
       .replace(/\s+/g, " ")
       .trim()
@@ -1689,7 +1702,7 @@ function normalizeImportedNames(values) {
 function parseCsvRoster(source) {
   const rows = parseCsvRows(source).map(row => row.map(cell => String(cell).trim()));
   if (!rows.length) return [];
-  const headerIndex = rows[0].findIndex(cell => /^(?:(?:player\s*)?name|guest)$/i.test(cell));
+  const headerIndex = rows[0].findIndex(cell => /^(?:(?:player\s*)?name|player|guest)$/i.test(cell));
   const firstColumnLooksNumbered = rows.slice(headerIndex >= 0 ? 1 : 0).every(row => /^\d+$/.test(row[0] ?? ""));
   const nameColumn = headerIndex >= 0 ? headerIndex : (firstColumnLooksNumbered ? 1 : 0);
   return normalizeImportedNames(rows.slice(headerIndex >= 0 ? 1 : 0).map(row => row[nameColumn]));
@@ -1742,15 +1755,19 @@ async function handlePlayerImportFile(event) {
     showToast("The roster file must be 8 MB or smaller.", "error");
     return;
   }
+  const operation = ++rosterImportOperation;
+  const importedForScript = state.scriptId;
   state.playerImportBusy = true;
   render();
   try {
     const names = extension === "csv"
       ? parseCsvRoster(await file.text())
       : normalizeImportedNames((await readRosterImageText(file)).split(/\r?\n/));
+    if (operation !== rosterImportOperation || state.scriptId !== importedForScript) return;
     state.playerImportBusy = false;
     applyImportedPlayerNames(names);
   } catch (error) {
+    if (operation !== rosterImportOperation || state.scriptId !== importedForScript) return;
     state.playerImportBusy = false;
     showToast(error?.message ? `Roster import failed: ${error.message}` : "Roster import failed.", "error");
   }
@@ -2185,7 +2202,7 @@ function openPoolEditor() {
     const c = chars[rid];
     const selected = state.rolePool.includes(rid);
     const selectedCount = state.rolePool.filter(roleId => roleId === rid).length;
-    const copyControl = state.playerCount > 15
+    const copyControl = state.playerCount >= 19 && c.type === "minion"
       ? `<select class="input" aria-label="${esc(c.name)} copies" style="width:58px;padding:3px 5px;font-size:12px" onchange="setPoolRoleCount('${rid}', this.value)"><option value="0" ${selectedCount === 0 ? "selected" : ""}>0</option><option value="1" ${selectedCount === 1 ? "selected" : ""}>1</option><option value="2" ${selectedCount >= 2 ? "selected" : ""}>2</option></select>`
       : `<input type="checkbox" aria-label="Include ${esc(c.name)} in the role pool" ${selected ? 'checked' : ''} onchange="togglePoolRole('${rid}', this.checked)">`;
     
@@ -3678,7 +3695,7 @@ function validateRoleSetup() {
       assignments: state.assignments,
       rolePool: state.rolePool,
       distribution,
-      allowDuplicateRoles: state.playerCount > 15
+      allowAdditionalMinionCopy: state.playerCount >= 19
     });
     return result.errors.map(error => error.message);
   }
@@ -3688,9 +3705,11 @@ function validateRoleSetup() {
   if (assigned.some(roleId => !roleId)) errors.push("Assign a character to every seat.");
   if (assigned.some(roleId => roleId && !validRoleIds.has(roleId))) errors.push("One or more assigned characters are invalid for this script.");
   const nonEmptyAssignments = assigned.filter(Boolean);
-  if (state.playerCount <= 15 && new Set(nonEmptyAssignments).size !== nonEmptyAssignments.length) errors.push("Each character may appear only once.");
-  if (state.rolePool.length !== state.playerCount || (state.playerCount <= 15 && new Set(state.rolePool).size !== state.rolePool.length)) {
-    errors.push(`The role pool must contain exactly ${state.playerCount} ${state.playerCount <= 15 ? "unique " : ""}characters.`);
+  const hasUnsupportedDuplicate = values => Object.entries(values.reduce((counts, roleId) => ({ ...counts, [roleId]: (counts[roleId] ?? 0) + 1 }), {}))
+    .some(([roleId, count]) => count > 1 && !(state.playerCount >= 19 && S().C[roleId]?.type === "minion" && count === 2));
+  if (hasUnsupportedDuplicate(nonEmptyAssignments)) errors.push("Only one additional Minion copy is allowed in 19- or 20-player games.");
+  if (state.rolePool.length !== state.playerCount || hasUnsupportedDuplicate(state.rolePool)) {
+    errors.push(`The role pool must contain exactly ${state.playerCount} characters with only the supported extra Minion copy.`);
   }
   const poolSet = new Set(state.rolePool);
   if (nonEmptyAssignments.some(roleId => !poolSet.has(roleId))) errors.push("Assigned characters must match the selected role pool.");

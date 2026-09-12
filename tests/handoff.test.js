@@ -276,7 +276,7 @@ test("browser adapter exposes handoff controls for every supported active script
   vm.runInContext(source, context, { filename: "scripts/handoff.js" });
 
   assert.equal(context.BOTCHandoffCodec.HANDOFF_VERSION, 2);
-  for (const scriptId of ["tb", "bmr", "sv", "uw"]) {
+  for (const scriptId of ["tb", "bmr", "sv"]) {
     context.state.scriptId = scriptId;
     assert.equal(context.canGiveHandoff(), true, scriptId);
   }
@@ -502,23 +502,12 @@ test("role-dependent handoff state is constrained to eligible roles and seats", 
   assert.deepEqual(cleanSv.game.vigormortisRetainedMinions, []);
 });
 
-test("Werewolf remains a valid handoff schema while timer enablement stays disabled", async () => {
+test("removed scripts are rejected by the handoff schema", async () => {
   const source = snapshotFor("uw");
   source.game.screen = "victory";
   source.game.winTeam = "manual";
   source.game.winnerSelection = ["werewolves", "tanner"];
-  const payload = await handoff.encodeHandoffPayload(source, codecOptions({ compress: false }));
-  const restored = await handoff.decodeHandoffPayload(payload, codecOptions());
-
-  assert.equal(restored.scriptId, "uw");
-  assert.deepEqual(restored.game.dist, { t: 0, o: 0, m: 0, d: 0 });
-  assert.equal(restored.game.playerCount, 5);
-  assert.deepEqual(restored.game.rolePool, ROLES.uw);
-  assert.equal(restored.game.winTeam, "manual");
-  assert.deepEqual(restored.game.winnerSelection, ["werewolves", "tanner"]);
-  assert.equal(restored.game.discussionTimerSessions[3].public.enabled, false);
-  assert.equal(restored.game.discussionTimerSessions[3].private.enabled, false);
-  assert.equal(restored.game.timerRunning, false);
+  await assert.rejects(() => handoff.encodeHandoffPayload(source, codecOptions({ compress: false })), { code: "unsupported-script" });
 });
 
 test("Zombuul registered-dead state survives a handoff round-trip", async () => {
@@ -580,7 +569,7 @@ test("poison markers are retained only for Trouble Brewing", () => {
   const troubleBrewing = handoff.sanitizeHandoffSnapshot(snapshotFor("tb"), codecOptions());
   assert.equal(troubleBrewing.game.poisonedIndex, 1);
 
-  for (const scriptId of ["bmr", "sv", "uw"]) {
+  for (const scriptId of ["bmr", "sv"]) {
     const source = snapshotFor(scriptId);
     source.game.poisonedIndex = 1;
     const clean = handoff.sanitizeHandoffSnapshot(source, codecOptions());
@@ -615,7 +604,7 @@ test("registered-dead markers are retained only for a living Bad Moon Rising Zom
   wrongCharacter.game.registeredDead = { 0: true };
   assert.equal(handoff.sanitizeHandoffSnapshot(wrongCharacter, options).game.registeredDead[0], false);
 
-  for (const scriptId of ["tb", "sv", "uw"]) {
+  for (const scriptId of ["tb", "sv"]) {
     const source = snapshotFor(scriptId);
     source.game.registeredDead = { 0: true };
     const clean = handoff.sanitizeHandoffSnapshot(source, codecOptions());
@@ -645,7 +634,7 @@ test("Po charge state is retained only when Bad Moon Rising has a Po", () => {
   withoutPo.game.poCharged = true;
   assert.equal(handoff.sanitizeHandoffSnapshot(withoutPo, options).game.poCharged, false);
 
-  for (const scriptId of ["tb", "sv", "uw"]) {
+  for (const scriptId of ["tb", "sv"]) {
     const source = snapshotFor(scriptId);
     source.game.poCharged = true;
     const clean = handoff.sanitizeHandoffSnapshot(source, codecOptions());

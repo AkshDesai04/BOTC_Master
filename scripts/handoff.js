@@ -33,7 +33,6 @@
       if (scriptId === "tb" && typeof TB !== "undefined") return TB.C;
       if (scriptId === "bmr" && typeof BMR !== "undefined") return BMR.C;
       if (scriptId === "sv" && typeof SV !== "undefined") return SV.C;
-      if (scriptId === "uw" && typeof UW !== "undefined") return UW.C;
       return null;
     }
 
@@ -70,8 +69,7 @@
       const labels = {
         tb: "Trouble Brewing",
         bmr: "Bad Moon Rising",
-        sv: "Sects & Violets",
-        uw: "Ultimate Werewolf"
+        sv: "Sects & Violets"
       };
       return labels[scriptId] || "Grimoire";
     }
@@ -659,7 +657,7 @@
 
   const HANDOFF_KIND = "botc-handoff";
   const HANDOFF_VERSION = 2;
-  const HANDOFF_SCRIPT_IDS = Object.freeze(["tb", "bmr", "sv", "uw"]);
+  const HANDOFF_SCRIPT_IDS = Object.freeze(["tb", "bmr", "sv"]);
   const V1_COMPRESSED_PREFIX = "BOTC1.";
   const V1_PART_PREFIX = "BOTCP:";
   const V2_JSON_PREFIX = "BOTC2.J.";
@@ -756,7 +754,6 @@
   }
 
   function scriptRange(scriptId) {
-    if (scriptId === "uw") return { min: 5, max: 75 };
     if (["tb", "bmr", "sv"].includes(scriptId)) return { min: 5, max: 20 };
     return { min: 5, max: 15 };
   }
