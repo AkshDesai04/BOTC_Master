@@ -2,16 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>🩸 Storyteller's Grimoire</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0a0a">
+<title>Storyteller's Grimoire</title>
 <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
 
-<div id="app"></div>
+<main id="app"></main>
 
 <!-- Load all BOTC script data -->
 <script src="scripts/runtime-config.js"></script>
+<script src="scripts/icons.js"></script>
+<script src="scripts/history.js"></script>
+<script src="scripts/game-rules.js"></script>
+<script src="scripts/email.js"></script>
 <script src="scripts/trouble_brewing.js"></script>
 <script src="scripts/bad_moon_rising.js"></script>
 <script src="scripts/sects_and_violets.js"></script>
@@ -28,6 +33,11 @@
       hydrateState(saved);
       state.showResume = true;
     } else {
+      const requestedScript = new URLSearchParams(window.location.search).get("script");
+      if (["tb", "bmr", "sv", "uw"].includes(requestedScript)) {
+        pickScript(requestedScript);
+        return;
+      }
       state.screen = "select";
     }
     render();
@@ -35,10 +45,10 @@
     console.error("Initialization error:", error);
     const app = document.getElementById("app");
     if (app) {
-      app.innerHTML = `<div class="screen" style="padding:32px;text-align:center">
-        <h2 style="color:var(--red);margin-bottom:16px">Error Loading Page</h2>
-        <p style="color:var(--text2);margin-bottom:8px">${error.message}</p>
-        <button class="btn btn-primary" style="margin-top:16px" onclick="location.reload()">Reload Page</button>
+      app.innerHTML = `<div class="screen" role="alert" style="padding:32px;text-align:center">
+        <h2 style="color:var(--red);margin-bottom:16px">Saved Session Could Not Be Loaded</h2>
+        <p style="color:var(--text2);margin-bottom:8px">The saved data is incomplete or damaged. Clear it to return to script selection.</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="localStorage.removeItem('botc_storyteller_v2');localStorage.removeItem('botc_storyteller_history_v1');localStorage.removeItem('botc_storyteller_email_outbox_v1');location.assign(location.pathname)">Clear Saved Session</button>
       </div>`;
     }
   }

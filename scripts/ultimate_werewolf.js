@@ -81,7 +81,7 @@ const UW_C = Object.fromEntries(UW_ROLE_DEFINITIONS.map(definition => {
 }));
 
 const UW_FIRST_NIGHT = [
-  { id: "_uw_night_rules", order: 1, title: "🌙 Night Rules", instructions: "All players close their eyes. Dead players may keep their eyes open and silently watch, but do not act." },
+  { id: "_uw_night_rules", order: 1, title: "Night Rules", instructions: "All players close their eyes. Dead players may keep their eyes open and silently watch, but do not act." },
   { id: "doppelganger", order: 2 },
   { id: "cupid", order: 3 },
   { id: "hoodlum", order: 5 },
@@ -115,7 +115,7 @@ const UW_FIRST_NIGHT = [
 ];
 
 const UW_OTHER_NIGHT = [
-  { id: "_uw_night_rules", order: 1, title: "🌙 Night Rules", instructions: "Dead players may silently watch the night. Dead players do not wake or become valid targets." },
+  { id: "_uw_night_rules", order: 1, title: "Night Rules", instructions: "Dead players may silently watch the night. Dead players do not wake or become valid targets." },
   { id: "doppelganger", order: 2 },
   { id: "wild-child", order: 3 },
   { id: "drunk", order: 4 },
@@ -147,7 +147,6 @@ const UW_OTHER_NIGHT = [
 const UW = {
   id: "uw",
   name: "Ultimate Werewolf",
-  emoji: "🐺",
   color: "#b7b8bd",
   tagline: "Physical-card moderator mode",
   desc: "Public discussion • Dead players watch nights • Manual resolution",
@@ -161,10 +160,10 @@ const UW = {
   deadWatchNight: true,
   playerLimits: { min: 5, max: 75 },
   winnerGroups: [
-    { id: "village", label: "Village", emoji: "🏘️" },
-    { id: "werewolves", label: "Werewolves", emoji: "🐺" },
-    { id: "vampires", label: "Vampires", emoji: "🧛" },
-    { id: "cult", label: "Cult", emoji: "🕯️" }
+    { id: "village", label: "Village" },
+    { id: "werewolves", label: "Werewolves" },
+    { id: "vampires", label: "Vampires" },
+    { id: "cult", label: "Cult" }
   ],
   soloWinnerRoles: ["bogeyman", "doppelganger", "hoodlum", "tanner", "bloody-mary", "chupacabra", "nostradamus"]
 };

@@ -1,4 +1,4 @@
-// Optional delivery endpoint. Leave blank to keep generated messages in the local outbox.
+// Optional delivery endpoint. Leave blank to disable email generation and delivery.
 window.GRIMOIRE_RUNTIME_CONFIG = {
   emailEndpoint: ""
 };
