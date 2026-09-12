@@ -146,6 +146,11 @@ test("the Pages workflow publishes only the curated static runtime", () => {
   const actionReferences = [...workflow.matchAll(/uses:\s*([^\s#]+)/g)].map(match => match[1]);
   assert.ok(actionReferences.length > 0);
   assert.equal(actionReferences.every(reference => /@[0-9a-f]{40}$/.test(reference)), true);
+  assert.match(workflow, /- name: Verify Gemini roster extraction/);
+  assert.match(workflow, /- name: Send deployment test email/);
+  assert.match(workflow, /gemini-3\.8-flash gemini-3\.7-flash gemini-3\.6-flash gemini-3\.5-flash gemma-4-31b gemma-4-26b/);
+  assert.ok(workflow.indexOf("- name: Verify Gemini roster extraction") < workflow.indexOf("- name: Assemble static site"));
+  assert.ok(workflow.indexOf("- name: Send deployment test email") < workflow.indexOf("- name: Assemble static site"));
   assert.match(workflow, /path:\s*_site\b/);
   assert.doesNotMatch(assembly, /\bcp\s+(?:-[^\s]+\s+)*\.\s/);
   assert.match(assembly, /find assets\/images -type f -name '\*\.png'/);

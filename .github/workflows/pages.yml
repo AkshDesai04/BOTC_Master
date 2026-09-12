@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          node-version: "22.12.0"
 
       - name: Verify JavaScript and tests
         shell: bash
@@ -34,6 +34,67 @@ jobs:
             node --check "$file"
           done
           node --test tests/*.test.js
+
+      - name: Verify Gemini roster extraction
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$GEMINI_KEY"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          request_body='{"contents":[{"role":"user","parts":[{"text":"Return JSON only: {\"names\":[\"Deployment check\"]}"}]}],"generationConfig":{"temperature":0,"responseMimeType":"application/json"}}'
+          models=(gemini-3.8-flash gemini-3.7-flash gemini-3.6-flash gemini-3.5-flash gemma-4-31b gemma-4-26b)
+          for model in "${models[@]}"; do
+            status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --max-time 30 --retry 2 --retry-all-errors --request POST --header 'Content-Type: application/json' --data "$request_body" "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}" || true)"
+            if [ "$status" = "200" ] && node -e 'const payload = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const text = payload?.candidates?.[0]?.content?.parts?.map(part => part?.text || "").join("") || ""; const parsed = JSON.parse((text.match(/\{[\s\S]*\}/) || [text])[0]); if (!Array.isArray(parsed.names)) process.exit(1);' "$response_file"; then
+              echo "Gemini roster extraction check passed with ${model}."
+              exit 0
+            fi
+          done
+          echo "No configured Gemini roster-extraction model completed the deployment check." >&2
+          exit 1
+
+      - name: Send deployment test email
+        env:
+          SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import smtplib
+          from email.message import EmailMessage
+
+          def recipients(value):
+              addresses = [address.strip() for address in re.split(r"[;,]", value)]
+              if not 1 <= len(addresses) <= 20 or any(not address for address in addresses):
+                  raise ValueError("EMAIL_TO must contain 1 to 20 comma- or semicolon-separated email addresses.")
+              if any(not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address) for address in addresses):
+                  raise ValueError("EMAIL_TO contains an invalid email address.")
+              return list(dict.fromkeys(addresses))
+
+          sender = os.environ.get("SMTP_EMAIL", "").strip()
+          password = re.sub(r"\s+", "", os.environ.get("SMTP_APP_PASSWORD", ""))
+          if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", sender):
+              raise ValueError("SMTP_EMAIL contains an invalid email address.")
+          if len(password) < 8:
+              raise ValueError("SMTP_APP_PASSWORD is not configured.")
+          email_to = recipients(os.environ.get("EMAIL_TO", ""))
+          message = EmailMessage()
+          message["From"] = sender
+          message["To"] = ", ".join(email_to)
+          message["Subject"] = "[BOTC] GitHub Pages deployment email test"
+          message.set_content("GitHub Pages pre-deployment email test passed. The BOTC site will publish only after this message and the Gemini check succeed.")
+          with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
+              server.login(sender, password)
+              server.send_message(message)
+          print("Deployment email check passed.")
+          PY
 
       - name: Inject roster import runtime config
         env:

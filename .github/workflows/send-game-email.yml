@@ -70,9 +70,18 @@ jobs:
           function normalizeEmailAddress(value, label) {
             const address = requireString(value, label, { minimum: 3, maximum: 254 }).trim();
             if (/\s|[\r\n]/.test(address) || !/^[^@]+@[^@]+\.[^@]+$/.test(address)) {
-              throw new TypeError(`${label} must contain one valid email address.`);
+              throw new TypeError(`${label} contains an invalid email address.`);
             }
             return address;
+          }
+
+          function normalizeEmailRecipients(value, label) {
+            const source = requireString(value, label, { minimum: 3, maximum: 4096 });
+            const addresses = source.split(/[;,]/).map(address => address.trim());
+            if (!addresses.length || addresses.length > 20 || addresses.some(address => !address)) {
+              throw new TypeError(`${label} must contain 1 to 20 comma- or semicolon-separated email addresses.`);
+            }
+            return [...new Set(addresses.map(address => normalizeEmailAddress(address, label)))];
           }
 
           function normalizeHandoverUrls(payload) {
@@ -165,7 +174,7 @@ jobs:
               "SMTP_APP_PASSWORD",
               { minimum: 8, maximum: 512 }
             );
-            const emailTo = normalizeEmailAddress(String(process.env.EMAIL_TO || "").trim(), "EMAIL_TO");
+            const emailTo = normalizeEmailRecipients(String(process.env.EMAIL_TO || ""), "EMAIL_TO");
 
             const eventText = fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8");
             const event = JSON.parse(eventText);
