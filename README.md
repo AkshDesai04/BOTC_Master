@@ -144,7 +144,7 @@ The included [`send-game-email.yml`](.github/workflows/send-game-email.yml) job 
 
 - `SMTP_EMAIL`
 - `SMTP_APP_PASSWORD`
-- `EMAIL_TO`
+- `EMAIL_TO` — one or more trusted recipient addresses, separated by commas or semicolons
 
 The workflow's concurrency group only serializes matching requests; it is not durable duplicate suppression. The relay must reject an `idempotencyKey` it has already accepted.
 

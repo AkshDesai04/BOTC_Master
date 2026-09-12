@@ -459,6 +459,9 @@ test("email workflow pins dependencies and validates multipart delivery inputs",
   assert.match(workflow, /supportedTypes = new Set\(\["game-start", "night-complete", "game-end"\]\)/);
   assert.match(workflow, /client_payload exceeds the safe delivery limit/);
   assert.match(workflow, /html must be a complete HTML document/);
+  assert.match(workflow, /function normalizeEmailRecipients/);
+  assert.match(workflow, /source\.split\(\/\[;,\]\//);
+  assert.match(workflow, /1 to 20 comma- or semicolon-separated email addresses/);
   assert.doesNotMatch(workflow, /rawHtml[^\n]*\.slice\(/);
 });
 
