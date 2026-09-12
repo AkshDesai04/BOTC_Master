@@ -6,14 +6,15 @@ const vm = require("node:vm");
 
 const script = name => fs.readFileSync(path.join(__dirname, "..", "scripts", name), "utf8");
 
-function createHarness() {
+function createHarness({ fetchImplementation = async () => ({ ok: true, json: async () => ({}) }) } = {}) {
   const storage = new Map();
+  const fetchCalls = [];
   const dom = {
     checkedTargets: [],
     characterValue: ""
   };
   const sandbox = {
-    console,
+    console: { ...console, warn() {} },
     crypto,
     document: {
       getElementById: id => id === "night-character-select"
@@ -31,7 +32,11 @@ function createHarness() {
     setInterval: () => 1,
     clearInterval: () => {},
     setTimeout,
-    clearTimeout
+    clearTimeout,
+    fetch(...args) {
+      fetchCalls.push(args);
+      return fetchImplementation(...args);
+    }
   };
   sandbox.__dom = dom;
   sandbox.window = sandbox;
@@ -47,7 +52,9 @@ function createHarness() {
     "common.js"
   ].forEach(file => vm.runInContext(script(file), context, { filename: `scripts/${file}` }));
   vm.runInContext("render = () => {}; globalThis.dispatchedEvents = []; dispatchGameEmail = eventType => { dispatchedEvents.push(eventType); return Promise.resolve(true); };", context);
-  return expression => vm.runInContext(expression, context);
+  const evaluate = expression => vm.runInContext(expression, context);
+  evaluate.fetchCalls = fetchCalls;
+  return evaluate;
 }
 
 test("a recorded execution is fully undoable and survives into the next night for Undertaker", () => {
@@ -124,6 +131,35 @@ test("CSV roster imports preserve names for editable setup and fill the minimum 
   evaluate("addRosterPlayer(); removeRosterPlayer(1);");
   assert.equal(evaluate("state.playerCount"), 5);
   assert.equal(evaluate("JSON.stringify(state.names)"), '["Ada","","","",""]');
+});
+
+test("Gemini roster extraction falls back after an unavailable model", async () => {
+  let calls = 0;
+  const evaluate = createHarness({
+    fetchImplementation: async () => {
+      calls += 1;
+      if (calls === 1) {
+        return { ok: false, status: 429, json: async () => ({ error: { message: "Rate limit reached" } }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: '{"names":["Ada","Bea","Ada"]}' }] } }] })
+      };
+    }
+  });
+  evaluate('window.ROSTER_DISPATCH_CONFIG = { geminiApiKey: "test-key" };');
+
+  const names = await evaluate('extractPlayerNamesWithGemini({ name: "players.csv", text: async () => "Ada\\nBea" })');
+
+  assert.equal(JSON.stringify(names), '["Ada","Bea"]');
+  assert.equal(
+    evaluate("JSON.stringify(ROSTER_IMPORT_MODELS)"),
+    '["gemini-3.8-flash","gemini-3.7-flash","gemini-3.6-flash","gemini-3.5-flash","gemma-4-31b","gemma-4-26b"]'
+  );
+  assert.equal(evaluate.fetchCalls.length, 2);
+  assert.match(evaluate.fetchCalls[0][0], /models\/gemini-3\.8-flash:generateContent/);
+  assert.match(evaluate.fetchCalls[1][0], /models\/gemini-3\.7-flash:generateContent/);
 });
 
 test("once-per-game characters leave the wake list after their ability is recorded", () => {

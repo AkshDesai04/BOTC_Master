@@ -1708,6 +1708,15 @@ function parseCsvRoster(source) {
   return normalizeImportedNames(rows.slice(headerIndex >= 0 ? 1 : 0).map(row => row[nameColumn]));
 }
 
+const ROSTER_IMPORT_MODELS = Object.freeze([
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemma-4-31b",
+  "gemma-4-26b"
+]);
+
 async function extractPlayerNamesWithGemini(file) {
   const apiKey = String(window.ROSTER_DISPATCH_CONFIG?.geminiApiKey ?? "").trim();
   if (!apiKey) throw new Error("Roster import is not configured on this deployment.");
@@ -1725,17 +1734,26 @@ async function extractPlayerNamesWithGemini(file) {
   const parts = isImage
     ? [{ text: prompt }, { inlineData: { mimeType: extension === "png" ? "image/png" : "image/jpeg", data } }]
     : [{ text: `${prompt}\n\nFILE_CONTENTS:\n${data}` }];
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, responseMimeType: "application/json" } })
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error?.message || `HTTP ${response.status}`);
-  const text = payload?.candidates?.[0]?.content?.parts?.map(part => part?.text ?? "").join("") ?? "";
-  const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? text);
-  if (!Array.isArray(parsed?.names)) throw new Error("The roster response did not contain a names array.");
-  return normalizeImportedNames(parsed.names);
+  let lastError = null;
+  for (const modelId of ROSTER_IMPORT_MODELS) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, responseMimeType: "application/json" } })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error?.message || `${modelId} returned HTTP ${response.status}`);
+      const text = payload?.candidates?.[0]?.content?.parts?.map(part => part?.text ?? "").join("") ?? "";
+      const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? text);
+      if (!Array.isArray(parsed?.names)) throw new Error(`${modelId} did not return a names array.`);
+      return normalizeImportedNames(parsed.names);
+    } catch (error) {
+      lastError = error;
+      console.warn(`Roster import model ${modelId} failed; trying the next available model.`, error);
+    }
+  }
+  throw lastError ?? new Error("No roster import model was available.");
 }
 
 function applyImportedPlayerNames(names) {
