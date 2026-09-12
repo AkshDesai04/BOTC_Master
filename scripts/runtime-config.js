@@ -1,7 +1,4 @@
-// Local / committed placeholder. Deploy workflow overwrites values from secrets.
-window.ROSTER_DISPATCH_CONFIG = {
-  owner: "AkshDesai04",
-  repo: "BOTC_Master",
-  token: "",
-  geminiApiKey: ""
+// Optional delivery endpoint. Leave blank to keep generated messages in the local outbox.
+window.GRIMOIRE_RUNTIME_CONFIG = {
+  emailEndpoint: ""
 };

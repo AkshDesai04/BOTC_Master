@@ -21,42 +21,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject runtime config from secrets
-        env:
-          ROSTER_DISPATCH_TOKEN: ${{ secrets.ROSTER_DISPATCH_TOKEN }}
-          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import sys
-
-          def escape_js(value: str) -> str:
-              return value.replace("\\", "\\\\").replace('"', '\\"')
-
-          token = os.environ.get("ROSTER_DISPATCH_TOKEN", "").strip()
-          gemini_key = os.environ.get("GEMINI_KEY", "").strip()
-          if not token:
-              print("ROSTER_DISPATCH_TOKEN secret is missing or empty.", file=sys.stderr)
-              sys.exit(1)
-          if not gemini_key:
-              print("GEMINI_KEY secret is missing or empty.", file=sys.stderr)
-              sys.exit(1)
-
-          content = f'''window.ROSTER_DISPATCH_CONFIG = {{
-            owner: "AkshDesai04",
-            repo: "BOTC_Master",
-            token: "{escape_js(token)}",
-            geminiApiKey: "{escape_js(gemini_key)}"
-          }};
-          '''
-          with open("scripts/runtime-config.js", "w", encoding="utf-8") as handle:
-              handle.write(content)
-          print(
-              "Injected runtime config (dispatch token length=%d, gemini key length=%d)."
-              % (len(token), len(gemini_key))
-          )
-          PY
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
