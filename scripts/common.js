@@ -2445,6 +2445,38 @@ async function deliverBuiltEmail(email, handoverUrls = []) {
       if (timeoutId !== null) window.clearTimeout(timeoutId);
     }
   }
+  const dispatch = window.ROSTER_DISPATCH_CONFIG ?? {};
+  const token = String(dispatch.token ?? "").trim();
+  const owner = String(dispatch.owner ?? "AkshDesai04").trim();
+  const repo = String(dispatch.repo ?? "BOTC_Master").trim();
+  if (token && owner && repo) {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/dispatches`, {
+        method: "POST",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        },
+        body: JSON.stringify({
+          event_type: "send-game-email",
+          client_payload: {
+            eventType: email.eventType,
+            subject: email.subject,
+            html: email.html,
+            text: email.text,
+            idempotencyKey: email.idempotencyKey,
+            handoverUrls: Array.isArray(email.handoverUrls) ? email.handoverUrls : handoverUrls
+          }
+        })
+      });
+      return response.ok;
+    } catch (error) {
+      console.error("GitHub email dispatch failed.", error);
+      return false;
+    }
+  }
   return false;
 }
 
@@ -2452,7 +2484,7 @@ const emailDispatchesInFlight = new Set();
 
 async function dispatchGameEmail(eventType) {
   if (!window.BOTCEmail?.EMAIL_EVENT_TYPES.includes(eventType)) return false;
-  if (!getConfiguredEmailEndpoint()) return false;
+  if (!getConfiguredEmailEndpoint() && !String(window.ROSTER_DISPATCH_CONFIG?.token ?? "").trim()) return false;
   const source = getSerializableState();
   const sourceStateRef = state;
   const sourceSessionId = source.sessionId;
