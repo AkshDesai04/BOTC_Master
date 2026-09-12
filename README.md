@@ -1,27 +1,25 @@
 # Storyteller's Grimoire
 
-A mobile-first, browser-based companion for running Trouble Brewing, Bad Moon Rising, Sects & Violets, and physical-card Ultimate Werewolf sessions.
+A mobile-first, browser-based companion for running Trouble Brewing, Bad Moon Rising, and Sects & Violets sessions.
 
 The app helps a Storyteller prepare a roster, assign characters, guide private reveals and night steps, track state changes, time discussions, record a chronicle, and transfer a live session to another device. It is a facilitator rather than a complete rules engine: the Storyteller remains responsible for applying the official rules and resolving interactions marked for manual handling.
 
-> This is an unofficial fan-made companion. Blood on the Clocktower, Ultimate Werewolf, character names, and associated artwork or trademarks belong to their respective owners. No affiliation or endorsement is claimed.
+> This is an unofficial fan-made companion. Blood on the Clocktower, character names, and associated artwork or trademarks belong to their respective owners. No affiliation or endorsement is claimed.
 
 ## Supported games
 
 | Game | Setup | Player range | Discussion timers |
 | --- | --- | ---: | --- |
-| Trouble Brewing | Standard character distribution | 5–15 | Public and private |
-| Bad Moon Rising | Standard character distribution | 5–15 | Public and private |
-| Sects & Violets | Standard character distribution | 5–15 | Public and private |
-| Ultimate Werewolf | Physical-card inventory | 5–75 | Not present |
+| Trouble Brewing | Standard character distribution | 5–20 | Public and private |
+| Bad Moon Rising | Standard character distribution | 5–20 | Public and private |
+| Sects & Violets | Standard character distribution | 5–20 | Public and private |
 
 The three Blood on the Clocktower scripts include their complete base character rosters, Traveller reference data, and first-night and other-night orders. Sects & Violets uses Seamstress in its official 13-Townsfolk roster. Trouble Brewing applies the Baron's setup adjustment; Bad Moon Rising prompts for the Godfather's legal choice of one fewer or one additional Outsider; Sects & Violets applies the Fang Gu and Vigormortis setup adjustments.
 
-Ultimate Werewolf records the physical cards dealt around the table and respects the configured inventory quantity for each card. Its role interactions and winner conditions remain under moderator control.
-
 ## What the app handles
 
-- Script selection and player-count limits.
+- Script selection and player-count limits through 20 players.
+- CSV and image roster import, with editable seating after import.
 - Nonblank, unique player names entered in seating order.
 - Standard Blood on the Clocktower distributions, editable character pools, random assignment, and manual assignment.
 - Strict setup checks before a Blood on the Clocktower game begins, including seat coverage, unique character limits, pool consistency, and effective type counts.
@@ -46,7 +44,6 @@ The app does not replace the official rulebook, tokens, night sheets, or a knowl
 3. Enter every player clockwise. Names must be filled in and unique.
 4. Prepare the characters.
    - For a Blood on the Clocktower script, review the generated pool, adjust it if needed, and assign each seat.
-   - For Ultimate Werewolf, record the physical card dealt to each seat. Cards at their inventory limit cannot be selected again.
 5. Resolve any script-specific setup fields shown by the app, then finalize the setup.
 6. For Blood on the Clocktower, pass the device to each player for the covered private reveal. The Storyteller then unlocks the next reveal.
 7. During play, use:
@@ -60,7 +57,7 @@ Controls that modify consequential state create a labeled history entry. Undo re
 
 ## Discussion timers
 
-Discussion timers exist only in Trouble Brewing, Bad Moon Rising, and Sects & Violets. Ultimate Werewolf has no timer controls or timer-selection UI.
+Discussion timers are available in Trouble Brewing, Bad Moon Rising, and Sects & Violets.
 
 Each Blood on the Clocktower day has independent **Public** and **Private** timer settings:
 
@@ -218,7 +215,6 @@ scripts/
   trouble_brewing.js      Trouble Brewing data
   bad_moon_rising.js      Bad Moon Rising data
   sects_and_violets.js    Sects & Violets data
-  ultimate_werewolf.js    Ultimate Werewolf data and inventory
   handoff-qr.js           Local QR encoder
   common.js               State, persistence, workflow handlers, and rendering
   handoff.js              Handoff schema, encoding, transfer UI, and restore
@@ -279,7 +275,7 @@ It covers timer isolation and persistence, all three Blood on the Clocktower dat
 
 Browser-facing paths are exercised through Node VM harnesses and static integration checks rather than a full browser-runner suite, so release verification still includes real browser testing.
 
-For release checks, also complete a mobile portrait pass through setup, reveal, first night, day timers, later-night flow, Undo, winner confirmation, and handoff for each Blood on the Clocktower script. Test Ultimate Werewolf separately and confirm that no timer control appears.
+For release checks, also complete a mobile portrait pass through setup, reveal, first night, day timers, later-night flow, Undo, winner confirmation, and handoff for each supported script.
 
 ## Known limitations
 
@@ -287,7 +283,6 @@ For release checks, also complete a mobile portrait pass through setup, reveal, 
 - Setup edits, roster edits, reveal navigation, and ordinary tab navigation are not Undo checkpoints.
 - Traveller records are available as reference data but are not part of the active setup flow.
 - Nominations and vote totals do not form a complete voting subsystem.
-- Ultimate Werewolf expects a physical deck and manual role-resolution decisions.
 - Camera QR decoding depends on browser support; link, JSON paste, and JSON upload are the portable fallbacks.
 - Large handoffs may require several QR scans. Copying the takeover link or JSON is usually faster.
 - A static GitHub Pages app cannot hold private mail credentials. Remote email therefore requires the optional operator-controlled HTTPS relay described above.

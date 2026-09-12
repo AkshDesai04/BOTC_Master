@@ -125,6 +125,34 @@ test("setup validation honors explicit quantities and effective distributions", 
   assert.equal(result.valid, true);
 });
 
+test("large standard rosters can use a repeated character when explicitly enabled", () => {
+  const townsfolk = Object.fromEntries(Array.from({ length: 13 }, (_, index) => [
+    `town-${index}`,
+    { id: `town-${index}`, name: `Town ${index}`, type: "townsfolk" }
+  ]));
+  const script = {
+    C: {
+      ...townsfolk,
+      minion: { id: "minion", name: "Minion", type: "minion" },
+      minionTwo: { id: "minionTwo", name: "Minion Two", type: "minion" },
+      minionThree: { id: "minionThree", name: "Minion Three", type: "minion" },
+      minionFour: { id: "minionFour", name: "Minion Four", type: "minion" },
+      demon: { id: "demon", name: "Demon", type: "demon" }
+    },
+    DIST: { 19: { t: 13, o: 0, m: 5, d: 1 } }
+  };
+  const roles = [...Object.keys(townsfolk), "minion", "minion", "minionTwo", "minionThree", "minionFour", "demon"];
+  const setup = {
+    script,
+    playerCount: 19,
+    names: Array.from({ length: 19 }, (_, index) => `Player ${index + 1}`),
+    assignments: Object.fromEntries(roles.map((roleId, seat) => [seat, roleId])),
+    rolePool: roles
+  };
+  assert.equal(validateSetup(setup).valid, false);
+  assert.equal(validateSetup({ ...setup, allowAdditionalMinionCopy: true }).valid, true);
+});
+
 test("wake expansion resolves a demon placeholder and filters dead characters", () => {
   const characters = {
     sailor: { id: "sailor", type: "townsfolk" },

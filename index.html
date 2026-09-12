@@ -20,7 +20,6 @@
 <script src="scripts/trouble_brewing.js"></script>
 <script src="scripts/bad_moon_rising.js"></script>
 <script src="scripts/sects_and_violets.js"></script>
-<script src="scripts/ultimate_werewolf.js"></script>
 <script src="scripts/handoff-qr.js"></script>
 <script src="scripts/common.js"></script>
 <script src="scripts/handoff.js"></script>
@@ -30,11 +29,10 @@
   try {
     const saved = loadFromStorage();
     if (saved && saved._saved) {
-      hydrateState(saved);
-      state.showResume = true;
+      if (hydrateState(saved) !== false) state.showResume = true;
     } else {
       const requestedScript = new URLSearchParams(window.location.search).get("script");
-      if (["tb", "bmr", "sv", "uw"].includes(requestedScript)) {
+      if (["tb", "bmr", "sv"].includes(requestedScript)) {
         pickScript(requestedScript);
         return;
       }

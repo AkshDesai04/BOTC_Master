@@ -149,9 +149,12 @@
 
     const assignmentCounts = countValues(assignedRoleIds);
     const poolCounts = countValues(Array.isArray(rolePool) ? rolePool : []);
+    const maximumRoleUses = role => options.allowAdditionalMinionCopy === true && role?.type === "minion"
+      ? Math.max(2, roleLimit(role))
+      : roleLimit(role);
     for (const [roleId, count] of assignmentCounts) {
       const role = characters?.[roleId];
-      if (role && count > roleLimit(role)) {
+      if (role && count > maximumRoleUses(role)) {
         addError("duplicate-unique-role", `${role.name ?? roleId} is assigned more than once.`, {
           roleId,
           count
@@ -160,7 +163,7 @@
     }
     for (const [roleId, count] of poolCounts) {
       const role = characters?.[roleId];
-      if (role && count > roleLimit(role)) {
+      if (role && count > maximumRoleUses(role)) {
         addError("duplicate-pool-role", `${role.name ?? roleId} appears too many times in the role pool.`, {
           roleId,
           count

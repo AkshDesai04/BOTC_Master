@@ -5,7 +5,9 @@ const TB_DIST = {
   5:{t:3,o:0,m:1,d:1}, 6:{t:3,o:1,m:1,d:1},
   7:{t:5,o:0,m:1,d:1}, 8:{t:5,o:1,m:1,d:1}, 9:{t:5,o:2,m:1,d:1},
   10:{t:7,o:0,m:2,d:1}, 11:{t:7,o:1,m:2,d:1}, 12:{t:7,o:2,m:2,d:1},
-  13:{t:9,o:0,m:3,d:1}, 14:{t:9,o:1,m:3,d:1}, 15:{t:9,o:2,m:3,d:1},
+    13:{t:9,o:0,m:3,d:1}, 14:{t:9,o:1,m:3,d:1}, 15:{t:9,o:2,m:3,d:1},
+    16:{t:11,o:0,m:4,d:1}, 17:{t:11,o:1,m:4,d:1}, 18:{t:11,o:2,m:4,d:1},
+    19:{t:13,o:0,m:5,d:1}, 20:{t:13,o:1,m:5,d:1},
 };
 
 const TB_C = {
@@ -132,6 +134,6 @@ const TB = {
   demonFixed: true,       // Imp is the only demon
   defaultDemon: ["imp"],
   hasDrunk: true,         // Needs Drunk-believes-as picker
-  playerLimits: { min: 5, max: 15 },
+  playerLimits: { min: 5, max: 20 },
   TRAVELLERS: TB_TRAVELLERS,
 };
