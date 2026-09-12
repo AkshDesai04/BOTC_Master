@@ -153,9 +153,13 @@ test("Gemini roster extraction falls back after an unavailable model", async () 
   const names = await evaluate('extractPlayerNamesWithGemini({ name: "players.csv", text: async () => "Ada\\nBea" })');
 
   assert.equal(JSON.stringify(names), '["Ada","Bea"]');
+  assert.equal(
+    evaluate("JSON.stringify(ROSTER_IMPORT_MODELS)"),
+    '["gemini-3.8-flash","gemini-3.7-flash","gemini-3.6-flash","gemini-3.5-flash","gemma-4-31b","gemma-4-26b"]'
+  );
   assert.equal(evaluate.fetchCalls.length, 2);
-  assert.match(evaluate.fetchCalls[0][0], /models\/gemini-3\.5-flash-lite:generateContent/);
-  assert.match(evaluate.fetchCalls[1][0], /models\/gemini-3\.5-flash:generateContent/);
+  assert.match(evaluate.fetchCalls[0][0], /models\/gemini-3\.8-flash:generateContent/);
+  assert.match(evaluate.fetchCalls[1][0], /models\/gemini-3\.7-flash:generateContent/);
 });
 
 test("once-per-game characters leave the wake list after their ability is recorded", () => {
