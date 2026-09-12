@@ -2146,10 +2146,10 @@ function renderTimerScreen() {
       <div style="position:relative;width:200px;height:200px;margin:0 auto 28px;display:flex;align-items:center;justify-content:center">
         <svg style="transform: rotate(-90deg);width:100%;height:100%">
           <circle stroke="var(--border)" fill="transparent" stroke-width="${stroke}" r="${normalizedRadius}" cx="${radius}" cy="${radius}" style="transform: scale(1.25);transform-origin:center"/>
-          <circle stroke="var(--red)" fill="transparent" stroke-width="${stroke}" stroke-dasharray="${circumference} ${circumference}" style="stroke-dashoffset:${strokeDashoffset};transition: stroke-dashoffset 0.5s;transform: scale(1.25);transform-origin:center" r="${normalizedRadius}" cx="${radius}" cy="${radius}"/>
+          <circle id="discussion-timer-progress" stroke="var(--red)" fill="transparent" stroke-width="${stroke}" stroke-dasharray="${circumference} ${circumference}" style="stroke-dashoffset:${strokeDashoffset};transition: stroke-dashoffset 0.5s linear;transform: scale(1.25);transform-origin:center" r="${normalizedRadius}" cx="${radius}" cy="${radius}"/>
         </svg>
         <div style="position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <span style="font-size:36px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums">${formatTime(state.timerSeconds)}</span>
+          <span id="discussion-timer-display" role="timer" aria-live="off" style="font-size:36px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:5ch">${formatTime(state.timerSeconds)}</span>
           <span style="font-size:10px;text-transform:uppercase;color:var(--text3);letter-spacing:1px">Remaining</span>
         </div>
       </div>
@@ -2162,10 +2162,10 @@ function renderTimerScreen() {
         </div>
         
         <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="toggleTimerRunning()">
+          <button id="discussion-timer-toggle" class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="toggleTimerRunning()" aria-label="${state.timerRunning ? 'Pause' : 'Start'} discussion timer">
             ${state.timerRunning ? '⏸' : '▶'}
           </button>
-          <span style="font-size:11px;color:var(--text3)">${state.timerRunning ? 'Pause' : 'Start'}</span>
+          <span id="discussion-timer-toggle-label" style="font-size:11px;color:var(--text3)">${state.timerRunning ? 'Pause' : 'Start'}</span>
         </div>
 
         <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
@@ -2197,26 +2197,35 @@ function startTimerUI() {
 }
 
 function startTimerTicker() {
-  if (state.timerIntervalId) clearInterval(state.timerIntervalId);
+  clearTimerInterval();
+  if (state.timerSeconds <= 0) {
+    state.timerRunning = false;
+    updateTimerDisplay();
+    return;
+  }
   state.timerRunning = true;
   state.timerIntervalId = setInterval(() => {
     if (state.timerRunning && state.timerSeconds > 0) {
       state.timerSeconds--;
       if (state.timerSeconds === 0) {
         state.timerRunning = false;
-        clearInterval(state.timerIntervalId);
+        clearTimerInterval();
         playAlarmAudio();
       }
       autoSave();
-      render();
+      updateTimerDisplay();
     }
   }, 1000);
 }
 
 function toggleTimerRunning() {
-  state.timerRunning = !state.timerRunning;
+  if (state.timerRunning) {
+    stopTimer();
+  } else {
+    startTimerTicker();
+  }
   autoSave();
-  render();
+  updateTimerDisplay();
 }
 
 function adjustTimerVal(seconds) {
@@ -2227,19 +2236,41 @@ function adjustTimerVal(seconds) {
 }
 
 function resetTimerVal() {
+  stopTimer();
   state.timerSeconds = 300;
   state.timerTotal = 300;
-  state.timerRunning = false;
   autoSave();
   render();
 }
 
-function stopTimer() {
-  state.timerRunning = false;
-  if (state.timerIntervalId) {
+function clearTimerInterval() {
+  if (state.timerIntervalId !== null) {
     clearInterval(state.timerIntervalId);
     state.timerIntervalId = null;
   }
+}
+
+function stopTimer() {
+  state.timerRunning = false;
+  clearTimerInterval();
+}
+
+function updateTimerDisplay() {
+  const display = document.getElementById("discussion-timer-display");
+  const progress = document.getElementById("discussion-timer-progress");
+  const toggle = document.getElementById("discussion-timer-toggle");
+  const toggleLabel = document.getElementById("discussion-timer-toggle-label");
+  const pct = state.timerTotal > 0 ? Math.max(0, Math.min(1, state.timerSeconds / state.timerTotal)) : 0;
+  const normalizedRadius = 80 - 8 * 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+
+  if (display) display.textContent = formatTime(state.timerSeconds);
+  if (progress) progress.style.strokeDashoffset = String(circumference - pct * circumference);
+  if (toggle) {
+    toggle.textContent = state.timerRunning ? '⏸' : '▶';
+    toggle.setAttribute("aria-label", `${state.timerRunning ? "Pause" : "Start"} discussion timer`);
+  }
+  if (toggleLabel) toggleLabel.textContent = state.timerRunning ? "Pause" : "Start";
 }
 
 function playAlarmAudio() {
