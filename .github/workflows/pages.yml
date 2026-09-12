@@ -35,6 +35,28 @@ jobs:
           done
           node --test tests/*.test.js
 
+      - name: Inject roster import runtime config
+        env:
+          ROSTER_DISPATCH_TOKEN: ${{ secrets.ROSTER_DISPATCH_TOKEN }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          token = os.environ.get("ROSTER_DISPATCH_TOKEN", "").strip()
+          gemini_key = os.environ.get("GEMINI_KEY", "").strip()
+          if not token or not gemini_key:
+              print("ROSTER_DISPATCH_TOKEN and GEMINI_KEY must be configured.", file=sys.stderr)
+              sys.exit(1)
+          content = 'window.GRIMOIRE_RUNTIME_CONFIG = { emailEndpoint: "" };\n'
+          content += "window.ROSTER_DISPATCH_CONFIG = " + json.dumps({"owner": "AkshDesai04", "repo": "BOTC_Master", "token": token, "geminiApiKey": gemini_key}) + ";\n"
+          with open("scripts/runtime-config.js", "w", encoding="utf-8") as handle:
+              handle.write(content)
+          PY
+
       - name: Assemble static site
         shell: bash
         run: |

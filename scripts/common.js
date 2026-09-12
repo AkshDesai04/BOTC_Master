@@ -1708,20 +1708,34 @@ function parseCsvRoster(source) {
   return normalizeImportedNames(rows.slice(headerIndex >= 0 ? 1 : 0).map(row => row[nameColumn]));
 }
 
-async function readRosterImageText(file) {
-  if (typeof window.TextDetector !== "function" || typeof createImageBitmap !== "function") {
-    throw new Error("Image text extraction is not available in this browser. Import a CSV instead.");
-  }
-  const bitmap = await createImageBitmap(file);
-  try {
-    const detections = await new window.TextDetector().detect(bitmap);
-    return detections
-      .sort((left, right) => (left.boundingBox?.y ?? 0) - (right.boundingBox?.y ?? 0) || (left.boundingBox?.x ?? 0) - (right.boundingBox?.x ?? 0))
-      .map(result => result.rawValue)
-      .join("\n");
-  } finally {
-    bitmap.close?.();
-  }
+async function extractPlayerNamesWithGemini(file) {
+  const apiKey = String(window.ROSTER_DISPATCH_CONFIG?.geminiApiKey ?? "").trim();
+  if (!apiKey) throw new Error("Roster import is not configured on this deployment.");
+  const extension = rosterFileExtension(file.name);
+  const isImage = ["png", "jpg", "jpeg"].includes(extension);
+  const data = isImage
+    ? await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? "").split(",").at(-1));
+      reader.onerror = () => reject(reader.error ?? new Error("Could not read the roster file."));
+      reader.readAsDataURL(file);
+    })
+    : await file.text();
+  const prompt = 'Extract every player name. Return JSON only: {"names":["Name One","Name Two"]}. Keep source order; omit headings, seat numbers, emails, phones, blanks, and duplicates.';
+  const parts = isImage
+    ? [{ text: prompt }, { inlineData: { mimeType: extension === "png" ? "image/png" : "image/jpeg", data } }]
+    : [{ text: `${prompt}\n\nFILE_CONTENTS:\n${data}` }];
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, responseMimeType: "application/json" } })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error?.message || `HTTP ${response.status}`);
+  const text = payload?.candidates?.[0]?.content?.parts?.map(part => part?.text ?? "").join("") ?? "";
+  const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? text);
+  if (!Array.isArray(parsed?.names)) throw new Error("The roster response did not contain a names array.");
+  return normalizeImportedNames(parsed.names);
 }
 
 function applyImportedPlayerNames(names) {
@@ -1760,9 +1774,7 @@ async function handlePlayerImportFile(event) {
   state.playerImportBusy = true;
   render();
   try {
-    const names = extension === "csv"
-      ? parseCsvRoster(await file.text())
-      : normalizeImportedNames((await readRosterImageText(file)).split(/\r?\n/));
+    const names = await extractPlayerNamesWithGemini(file);
     if (operation !== rosterImportOperation || state.scriptId !== importedForScript) return;
     state.playerImportBusy = false;
     applyImportedPlayerNames(names);
@@ -2433,6 +2445,38 @@ async function deliverBuiltEmail(email, handoverUrls = []) {
       if (timeoutId !== null) window.clearTimeout(timeoutId);
     }
   }
+  const dispatch = window.ROSTER_DISPATCH_CONFIG ?? {};
+  const token = String(dispatch.token ?? "").trim();
+  const owner = String(dispatch.owner ?? "AkshDesai04").trim();
+  const repo = String(dispatch.repo ?? "BOTC_Master").trim();
+  if (token && owner && repo) {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/dispatches`, {
+        method: "POST",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        },
+        body: JSON.stringify({
+          event_type: "send-game-email",
+          client_payload: {
+            eventType: email.eventType,
+            subject: email.subject,
+            html: email.html,
+            text: email.text,
+            idempotencyKey: email.idempotencyKey,
+            handoverUrls: Array.isArray(email.handoverUrls) ? email.handoverUrls : handoverUrls
+          }
+        })
+      });
+      return response.ok;
+    } catch (error) {
+      console.error("GitHub email dispatch failed.", error);
+      return false;
+    }
+  }
   return false;
 }
 
@@ -2440,7 +2484,7 @@ const emailDispatchesInFlight = new Set();
 
 async function dispatchGameEmail(eventType) {
   if (!window.BOTCEmail?.EMAIL_EVENT_TYPES.includes(eventType)) return false;
-  if (!getConfiguredEmailEndpoint()) return false;
+  if (!getConfiguredEmailEndpoint() && !String(window.ROSTER_DISPATCH_CONFIG?.token ?? "").trim()) return false;
   const source = getSerializableState();
   const sourceStateRef = state;
   const sourceSessionId = source.sessionId;
