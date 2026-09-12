@@ -647,6 +647,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .timer-phase-dot {
   padding: 4px 12px;
   border-radius: 6px;
+  border: 1px solid transparent;
+  appearance: none;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 700;
   background: var(--surface2);
@@ -659,6 +662,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .timer-phase-dot.current {
   background: rgba(243, 156, 18, 0.15);
   color: var(--orange);
+  border-color: rgba(243, 156, 18, 0.5);
+}
+.timer-phase-dot:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
 }
 .timer-phase-dot.done {
   background: rgba(45, 90, 39, 0.15);

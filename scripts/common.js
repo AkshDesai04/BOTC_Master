@@ -137,6 +137,7 @@ let state = {
   timerTotal: 300,
   timerRunning: false,
   timerIntervalId: null,
+  timerSessionDay: 1,
   discussionTimerDefaults: { public: 300, private: 300 },
   discussionTimerSessions: {},
   activeDiscussionType: "public",
@@ -266,7 +267,7 @@ function ensureDiscussionTimerSession(dayNum = state.dayNum) {
   return state.discussionTimerSessions[sessionKey];
 }
 
-function normalizeDiscussionTimerState() {
+function normalizeDiscussionTimerState({ migrateLegacyTimer = false } = {}) {
   const legacyDuration = normalizeDiscussionDuration(state.timerTotal);
   const rawDefaults = state.discussionTimerDefaults;
   state.discussionTimerDefaults = {
@@ -289,7 +290,7 @@ function normalizeDiscussionTimerState() {
   const hadCurrentSession = Boolean(state.discussionTimerSessions[currentKey]);
   const currentSession = ensureDiscussionTimerSession();
   const activeTimer = currentSession[state.activeDiscussionType];
-  if (!hadCurrentSession) {
+  if (!hadCurrentSession && migrateLegacyTimer) {
     activeTimer.durationSeconds = legacyDuration;
     activeTimer.remainingSeconds = normalizeDiscussionRemaining(state.timerSeconds, legacyDuration);
     state.discussionTimerDefaults[state.activeDiscussionType] = legacyDuration;
@@ -298,9 +299,12 @@ function normalizeDiscussionTimerState() {
   state.timerSeconds = activeTimer.remainingSeconds;
   state.timerRunning = false;
   state.timerIntervalId = null;
+  state.timerSessionDay = state.dayNum;
 }
 
 function hydrateState(saved) {
+  const hasDiscussionTimerState = Object.prototype.hasOwnProperty.call(saved, "discussionTimerDefaults")
+    || Object.prototype.hasOwnProperty.call(saved, "discussionTimerSessions");
   Object.assign(state, saved);
   if (!Object.prototype.hasOwnProperty.call(saved, "discussionTimerDefaults")) {
     state.discussionTimerDefaults = null;
@@ -313,7 +317,7 @@ function hydrateState(saved) {
   }
   state.timerRunning = false;
   state.timerIntervalId = null;
-  normalizeDiscussionTimerState();
+  normalizeDiscussionTimerState({ migrateLegacyTimer: !hasDiscussionTimerState });
 }
 
 function resetEngine() {
@@ -351,6 +355,7 @@ function resetEngine() {
     timerTotal: 300,
     timerRunning: false,
     timerIntervalId: null,
+    timerSessionDay: 1,
     discussionTimerDefaults: { public: 300, private: 300 },
     discussionTimerSessions: {},
     activeDiscussionType: "public",
@@ -2176,7 +2181,17 @@ function proceedToDay() {
     badgeColor: "var(--border)"
   });
 
-  ensureDiscussionTimerSession();
+  const discussionSession = ensureDiscussionTimerSession();
+  if (canConfigureDiscussionTimers()) {
+    clearTimerInterval();
+    state.timerRunning = false;
+    const activeType = DISCUSSION_TIMER_TYPES.includes(state.activeDiscussionType)
+      ? state.activeDiscussionType
+      : "public";
+    state.timerTotal = discussionSession[activeType].durationSeconds;
+    state.timerSeconds = discussionSession[activeType].remainingSeconds;
+    state.timerSessionDay = state.dayNum;
+  }
   autoSave();
   render();
 }
@@ -2409,6 +2424,7 @@ function getDiscussionTimer(type = state.activeDiscussionType) {
 }
 
 function syncActiveDiscussionTimer(updateDefault = false) {
+  if (state.timerSessionDay !== state.dayNum) return;
   const timer = getDiscussionTimer();
   if (!timer) return;
   timer.durationSeconds = normalizeDiscussionDuration(state.timerTotal, timer.durationSeconds);
@@ -2440,6 +2456,7 @@ function adjustDiscussionTimerDuration(type, seconds) {
   timer.remainingSeconds = nextDuration;
   state.discussionTimerDefaults[type] = nextDuration;
   if (state.activeDiscussionType === type) {
+    state.timerSessionDay = state.dayNum;
     state.timerTotal = nextDuration;
     state.timerSeconds = nextDuration;
   }
@@ -2455,6 +2472,7 @@ function switchDiscussionTimer(type) {
   state.activeDiscussionType = type;
   state.timerTotal = timer.durationSeconds;
   state.timerSeconds = timer.remainingSeconds;
+  state.timerSessionDay = state.dayNum;
   autoSave();
   render();
 }
@@ -2463,10 +2481,16 @@ function startTimerUI(type = state.activeDiscussionType) {
   if (!canConfigureDiscussionTimers() || !DISCUSSION_TIMER_TYPES.includes(type)) return;
   const timer = getDiscussionTimer(type);
   if (!timer?.enabled) return;
-  stopTimer();
+  if (state.timerSessionDay === state.dayNum) {
+    stopTimer();
+  } else {
+    state.timerRunning = false;
+    clearTimerInterval();
+  }
   state.activeDiscussionType = type;
   state.timerTotal = timer.durationSeconds;
   state.timerSeconds = timer.remainingSeconds;
+  state.timerSessionDay = state.dayNum;
   state.tab = "timer";
   startTimerTicker();
   autoSave();
@@ -2525,7 +2549,7 @@ function adjustTimerVal(seconds) {
   state.timerTotal = normalizeDiscussionDuration(state.timerTotal + Math.max(0, appliedSeconds), state.timerTotal);
   syncActiveDiscussionTimer(true);
   autoSave();
-  render();
+  updateTimerDisplay();
 }
 
 function resetTimerVal() {
@@ -2537,7 +2561,7 @@ function resetTimerVal() {
   state.timerSeconds = timer.durationSeconds;
   syncActiveDiscussionTimer();
   autoSave();
-  render();
+  updateTimerDisplay();
 }
 
 function clearTimerInterval() {
@@ -2550,7 +2574,9 @@ function clearTimerInterval() {
 function stopTimer() {
   state.timerRunning = false;
   clearTimerInterval();
-  if (canConfigureDiscussionTimers()) syncActiveDiscussionTimer();
+  if (canConfigureDiscussionTimers() && state.timerSessionDay === state.dayNum) {
+    syncActiveDiscussionTimer();
+  }
 }
 
 function updateTimerDisplay() {

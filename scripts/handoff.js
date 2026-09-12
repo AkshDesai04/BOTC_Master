@@ -402,6 +402,8 @@ function commitHandoffSnapshot(snapshot) {
   stopTimer();
   stopHandoffScanner();
   const game = snapshot.game;
+  const hasDiscussionTimerState = Object.prototype.hasOwnProperty.call(game, "discussionTimerDefaults")
+    || Object.prototype.hasOwnProperty.call(game, "discussionTimerSessions");
   state = {
     ...state,
     ...game,
@@ -426,7 +428,7 @@ function commitHandoffSnapshot(snapshot) {
     activeDiscussionType: game.activeDiscussionType ?? "public",
     expandedPlayer: -1
   };
-  normalizeDiscussionTimerState();
+  normalizeDiscussionTimerState({ migrateLegacyTimer: !hasDiscussionTimerState });
   if (!["game", "reveal", "victory", "roles"].includes(state.screen)) state.screen = "game";
   autoSave();
   render();
