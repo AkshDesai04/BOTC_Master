@@ -94,6 +94,78 @@ test("a recorded execution is fully undoable and survives into the next night fo
   assert.equal(evaluate("getActiveWakeList(TB_OTHER_NIGHT).some(node => node.id === 'undertaker')"), true);
 });
 
+test("Trouble Brewing ends when the Imp dies without a living successor", () => {
+  const evaluate = createHarness();
+  evaluate(`
+    state.scriptId = "tb";
+    state.screen = "game";
+    state.phase = "day";
+    state.dayNum = 1;
+    state.playerCount = 5;
+    state.names = ["Imp", "Chef", "Empath", "Monk", "Poisoner"];
+    state.assignments = { 0: "imp", 1: "chef", 2: "empath", 3: "monk", 4: "poisoner" };
+    state.rolePool = Object.values(state.assignments);
+    state.alive = { 0: true, 1: true, 2: true, 3: true, 4: true };
+    state.votes = { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1 };
+    state.ghostVotes = { 0: false, 1: false, 2: false, 3: false, 4: false };
+    state.chronicle = [];
+    requestExecution(0);
+    runConfirmedAction();
+  `);
+
+  assert.equal(evaluate("state.alive[0]"), false);
+  assert.equal(evaluate("state.winTeam"), "good");
+  assert.equal(evaluate("state.screen"), "victory");
+  assert.equal(evaluate("dispatchedEvents.at(-1)"), "game-end");
+});
+
+test("manually marking the last Trouble Brewing Demon dead ends the game", () => {
+  const evaluate = createHarness();
+  evaluate(`
+    state.scriptId = "tb";
+    state.screen = "game";
+    state.phase = "day";
+    state.dayNum = 1;
+    state.playerCount = 4;
+    state.names = ["Imp", "Chef", "Empath", "Monk"];
+    state.assignments = { 0: "imp", 1: "chef", 2: "empath", 3: "monk" };
+    state.rolePool = Object.values(state.assignments);
+    state.alive = { 0: true, 1: true, 2: true, 3: true };
+    state.votes = { 0: 1, 1: 1, 2: 1, 3: 1 };
+    state.ghostVotes = { 0: false, 1: false, 2: false, 3: false };
+    state.chronicle = [];
+    togglePlayerAlive(0);
+  `);
+
+  assert.equal(evaluate("state.winTeam"), "good");
+  assert.equal(evaluate("state.screen"), "victory");
+});
+
+test("Trouble Brewing resolves an overnight Imp death before showing the day", () => {
+  const evaluate = createHarness();
+  evaluate(`
+    state.scriptId = "tb";
+    state.screen = "game";
+    state.phase = "night";
+    state.dayNum = 2;
+    state.playerCount = 5;
+    state.names = ["Imp", "Chef", "Empath", "Monk", "Poisoner"];
+    state.assignments = { 0: "imp", 1: "chef", 2: "empath", 3: "monk", 4: "poisoner" };
+    state.rolePool = Object.values(state.assignments);
+    state.alive = { 0: true, 1: true, 2: true, 3: true, 4: true };
+    state.votes = { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1 };
+    state.ghostVotes = { 0: false, 1: false, 2: false, 3: false, 4: false };
+    state.deathsLastNight = [0];
+    state.nightLog = [];
+    state.chronicle = [];
+    proceedToDay();
+  `);
+
+  assert.equal(evaluate("state.alive[0]"), false);
+  assert.equal(evaluate("state.winTeam"), "good");
+  assert.equal(evaluate("state.screen"), "victory");
+});
+
 test("the game lifecycle emits only the three supported email events", () => {
   const evaluate = createHarness();
   evaluate(`

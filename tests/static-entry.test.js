@@ -122,6 +122,8 @@ test("responsive styles cover narrow screens, safe areas, motion preferences, an
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   assert.match(css, /env\(safe-area-inset-(?:top|right|bottom|left)\)/);
   assert.match(css, /font-variant-numeric:\s*tabular-nums/);
+  assert.match(css, /\.discussion-timer-toggle\s*\{[^}]*white-space:\s*nowrap/s);
+  assert.match(css, /\.grimoire-view\s*\{[^}]*padding-right:\s*0;[^}]*padding-left:\s*0/s);
   assert.doesNotMatch(css, /@import\s+url|https?:\/\/fonts\./i);
 });
 
