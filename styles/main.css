@@ -1071,6 +1071,8 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
   min-height: var(--tap-target);
   padding: 4px 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .discussion-timer-toggle input {
   width: 20px;
@@ -1090,6 +1092,11 @@ input[type="range"]::-moz-range-thumb {
   .discussion-timer-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.grimoire-view {
+  min-width: 0;
+  padding: 16px;
 }
 
 /* ── SELECTION BUTTONS (Night Walker) ── */
@@ -1488,6 +1495,11 @@ label.btn {
 
   .timer-setting-row {
     align-items: flex-start;
+  }
+
+  .grimoire-view {
+    padding-right: 0;
+    padding-left: 0;
   }
 }
 

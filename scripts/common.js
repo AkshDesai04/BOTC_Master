@@ -3704,6 +3704,7 @@ function proceedToDay() {
     return;
   }
   recordHistory(`complete Night ${state.dayNum}`);
+  const livingCountBeforeDeaths = Object.keys(state.assignments).map(Number).filter(isPlayerPubliclyAlive).length;
   state.phase = "day";
   state.tab = "day";
   state.activeWakeIdx = 0;
@@ -3718,6 +3719,13 @@ function proceedToDay() {
     state.alive[pIdx] = false;
     if (isUltimateWerewolf()) state.votes[pIdx] = 0;
   });
+  const deadTroubleBrewingDemon = state.deathsLastNight.find(playerIndex => (
+    S().C[state.assignments[playerIndex]]?.type === "demon"
+  ));
+  if (
+    deadTroubleBrewingDemon !== undefined
+    && resolveTroubleBrewingDemonDeath(deadTroubleBrewingDemon, livingCountBeforeDeaths) === "good"
+  ) return;
 
   // Chronicle day entry
   state.chronicle.push({
@@ -4647,7 +4655,7 @@ function renderGrimoireTab() {
   }
 
   return `
-    <div style="padding:16px">
+    <div class="grimoire-view">
       <div style="margin-bottom:20px">
         <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:4px">Grimoire</h3>
         <p style="color:var(--text3);font-size:13px">Active overview of player seats, tokens, and alignments.</p>
@@ -4852,16 +4860,35 @@ function swapPlayerCharacters(firstIndex, secondIndex, swapAlignments = false) {
 }
 
 function resolveTroubleBrewingDemonDeath(deadPlayerIndex, livingCountBeforeDeath) {
-  if (state.scriptId !== "tb" || livingCountBeforeDeath < 5) return null;
+  if (state.scriptId !== "tb") return null;
   const demonRoleId = state.assignments[deadPlayerIndex];
   if (S().C[demonRoleId]?.type !== "demon") return null;
-  const successorEntry = Object.entries(state.assignments).find(([seat, roleId]) => (
-    roleId === "scarletwoman"
+  const livingDemonIndex = Object.entries(state.assignments).find(([seat, roleId]) => (
+    Number(seat) !== Number(deadPlayerIndex)
     && state.alive[seat] !== false
-    && Number(seat) !== deadPlayerIndex
-    && !isPoisonedSeat(seat)
-  ));
-  if (!successorEntry) return null;
+    && S().C[roleId]?.type === "demon"
+  ))?.[0];
+  if (livingDemonIndex !== undefined) return Number(livingDemonIndex);
+  const starpassPending = state.phase === "night"
+    && canTriggerStarpass(deadPlayerIndex)
+    && Object.entries(state.assignments).some(([seat, roleId]) => (
+      Number(seat) !== Number(deadPlayerIndex)
+      && state.alive[seat] !== false
+      && S().C[roleId]?.type === "minion"
+    ));
+  if (starpassPending) return null;
+  const successorEntry = livingCountBeforeDeath >= 5
+    ? Object.entries(state.assignments).find(([seat, roleId]) => (
+      roleId === "scarletwoman"
+      && state.alive[seat] !== false
+      && Number(seat) !== deadPlayerIndex
+      && !isPoisonedSeat(seat)
+    ))
+    : undefined;
+  if (!successorEntry) {
+    triggerWin("good");
+    return "good";
+  }
   const successorIndex = Number(successorEntry[0]);
   state.assignments[successorIndex] = demonRoleId;
   state.alignments[successorIndex] = "evil";
