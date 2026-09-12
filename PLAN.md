@@ -14,7 +14,7 @@ The current worktree contains a large, connected set of changes. Do not discard 
 4. Ultimate Werewolf must remain completely outside timer configuration and timer selection. Do not show a disabled timer control for it.
 5. Preserve the existing dark, restrained visual direction.
 6. Do not use emoji as interface icons. Continue using the shared SVG icon module.
-7. Do not add prohibited assistant-related terminology to source, comments, documentation, interface copy, emails, commit messages, or Git metadata.
+7. Do not add restricted terminology to source, comments, documentation, interface copy, emails, commit messages, or Git metadata.
 8. Never put browser-consumable service credentials in tracked files. The optional email relay is configured at runtime and remains outside static hosting.
 9. Use logical commits only when the relevant group is coherent and its focused tests pass.
 10. Attempt to push after logical milestones, but do not rewrite published history or alter remotes merely to bypass an authorization problem.

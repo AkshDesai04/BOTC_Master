@@ -1,6 +1,6 @@
 # Blood on the Clocktower Role Images
 
-This directory contains role images/icons for all characters in Blood on the Clocktower.
+This directory contains optional character artwork for Blood on the Clocktower. The checked-in PNG set currently covers Trouble Brewing and Bad Moon Rising; characters without artwork use the app's vector category fallback.
 
 ## Directory Structure
 
@@ -71,7 +71,7 @@ for char_type, char_list in characters.items():
 
 ## Image Requirements
 
-- **Format**: PNG (preferred) or SVG
+- **Format**: PNG (required by the current runtime and Pages artifact)
 - **Size**: Recommended 256x256px or larger (will be scaled down in UI)
 - **Background**: Transparent background preferred
 - **Quality**: High quality, clear images
@@ -102,8 +102,20 @@ for char_type, char_list in characters.items():
 
 **Travellers**: apprentice, matron, voudon, judge, bishop
 
+### Sects & Violets
+
+**Townsfolk**: clockmaker, dreamer, snakecharmer, mathematician, flowergirl, towncrier, oracle, savant, seamstress, philosopher, artist, juggler, sage
+
+**Outsiders**: mutant, sweetheart, barber, klutz
+
+**Minions**: eviltwin, witch, cerenovus, pithag
+
+**Demons**: fanggu, vigormortis, nodashi, vortox
+
+**Travellers**: barista, harlot, butcher, bonecollector, deviant
+
 ## Notes
 
-- Images will gracefully fail if not found (using `onerror` handler)
-- The app will display emoji fallbacks if images are missing
+- Images gracefully fall back when the corresponding PNG is absent.
+- The app displays reusable vector category icons when images are missing.
 - Ensure all images are properly licensed for use
