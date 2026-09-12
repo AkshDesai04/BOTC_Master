@@ -64,7 +64,7 @@ A moderator-led physical-card mode for 5–75 recorded seats. The app does not c
 - Apply queued night deaths when proceeding to day.
 - Let the operator manually mark a player dead or alive.
 - Offer a manual Blood on the Clocktower starpass control that moves the current Demon role to a selected living Minion.
-- Run a five-minute discussion timer, with pause, reset, and add-30-seconds controls, and attempt to sound a short Web Audio alarm at zero.
+- Configure independent public and private discussion timers for each Blood on the Clocktower day, carrying each type's latest duration into the next day, with pause, reset, and add-30-seconds controls and a short Web Audio alarm at zero. Discussion timers are disabled in Ultimate Werewolf.
 - Let the operator manually declare good/evil victory in Blood on the Clocktower.
 - Let the moderator manually select one or more team and eligible individual winners in Ultimate Werewolf.
 - Save the current session in the browser and offer to resume it after reload.
@@ -437,7 +437,7 @@ White Wolf and Lone Wolf are grouped with the Werewolf team above but are also a
 ## Persistence and privacy
 
 - Session state is serialized as JSON in the current browser's `localStorage` under `botc_storyteller_v2`.
-- Saved data includes player names, script, distribution, assignments, alive/dead status, night targets, chronicle entries, timer values, declared winners, and the current Trouble Brewing Poisoner target.
+- Saved data includes player names, script, distribution, assignments, alive/dead status, night targets, chronicle entries, per-day public/private timer settings and values, declared winners, and the current Trouble Brewing Poisoner target.
 - Trouble Brewing saves also include each Drunk seat's believed Townsfolk and the Fortune Teller Red Herring. Older saves without these fields load with safe empty defaults; an active legacy Drunk game returns to role setup so the Storyteller can make the required secret choice.
 - Reloading the main page offers to resume a saved session.
 - The timer is paused after a resumed reload for safety.
@@ -600,7 +600,7 @@ If documentation or UI says an effect occurs automatically, add and test the cor
 4. For Blood on the Clocktower, complete every private reveal and both first/other-night transitions.
 5. For Ultimate Werewolf, assign cards up to their quantities and verify the next copy is disabled.
 6. Mark players dead/alive and confirm night filtering and voting reminders match the selected mode.
-7. Run, pause, extend, reset, and finish the timer.
+7. On each Blood on the Clocktower script, enable/disable and configure public/private timers independently; verify the latest value for each type carries into the next day, then run, pause, extend, reset, and finish a timer. Confirm Ultimate Werewolf shows only disabled timer controls.
 8. Declare winners and inspect the chronicle.
 9. Reload, resume, then reset and confirm the saved session is removed.
 10. Test both with and without role image files.

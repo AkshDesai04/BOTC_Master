@@ -421,8 +421,12 @@ function commitHandoffSnapshot(snapshot) {
     showWinnerPicker: false,
     timerRunning: false,
     timerIntervalId: null,
+    discussionTimerDefaults: game.discussionTimerDefaults ?? null,
+    discussionTimerSessions: game.discussionTimerSessions ?? {},
+    activeDiscussionType: game.activeDiscussionType ?? "public",
     expandedPlayer: -1
   };
+  normalizeDiscussionTimerState();
   if (!["game", "reveal", "victory", "roles"].includes(state.screen)) state.screen = "game";
   autoSave();
   render();

@@ -95,6 +95,10 @@ function renderRoleImage(roleId, type, size = 32, style = "") {
 // GLOBAL GAME STATE
 // ══════════════════════════════════════════════════════════════════════════
 const SAVE_KEY = "botc_storyteller_v2";
+const DISCUSSION_TIMER_TYPES = ["public", "private"];
+const DEFAULT_DISCUSSION_TIMER_SECONDS = 300;
+const MIN_DISCUSSION_TIMER_SECONDS = 30;
+const MAX_DISCUSSION_TIMER_SECONDS = 3600;
 
 let state = {
   screen: "select",       // select | count | names | roles | reveal | game | victory
@@ -133,6 +137,9 @@ let state = {
   timerTotal: 300,
   timerRunning: false,
   timerIntervalId: null,
+  discussionTimerDefaults: { public: 300, private: 300 },
+  discussionTimerSessions: {},
+  activeDiscussionType: "public",
 
   // UI helpers
   tab: "grimoire",        // grimoire | night | day | chronicle
@@ -170,6 +177,9 @@ function getSerializableState() {
     winnerSelection: state.winnerSelection,
     timerSeconds: state.timerSeconds,
     timerTotal: state.timerTotal,
+    discussionTimerDefaults: state.discussionTimerDefaults,
+    discussionTimerSessions: state.discussionTimerSessions,
+    activeDiscussionType: state.activeDiscussionType,
     tab: state.tab
   };
 }
@@ -189,6 +199,121 @@ function loadFromStorage() {
 
 function clearSave() {
   try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
+
+function normalizeDiscussionDuration(value, fallback = DEFAULT_DISCUSSION_TIMER_SECONDS) {
+  const parsed = Number(value);
+  const safeFallback = Number.isFinite(Number(fallback)) ? Number(fallback) : DEFAULT_DISCUSSION_TIMER_SECONDS;
+  return Math.max(
+    MIN_DISCUSSION_TIMER_SECONDS,
+    Math.min(MAX_DISCUSSION_TIMER_SECONDS, Math.round(Number.isFinite(parsed) ? parsed : safeFallback))
+  );
+}
+
+function normalizeDiscussionRemaining(value, duration) {
+  const parsed = Number(value);
+  return Math.max(0, Math.min(duration, Math.round(Number.isFinite(parsed) ? parsed : duration)));
+}
+
+function createDiscussionTimerSession() {
+  const timerAllowed = !isUltimateWerewolf();
+  return Object.fromEntries(DISCUSSION_TIMER_TYPES.map(type => {
+    const durationSeconds = normalizeDiscussionDuration(state.discussionTimerDefaults?.[type]);
+    return [type, { enabled: timerAllowed, durationSeconds, remainingSeconds: durationSeconds }];
+  }));
+}
+
+function normalizeDiscussionTimerSession(session) {
+  const timerAllowed = !isUltimateWerewolf();
+  const normalized = {};
+  DISCUSSION_TIMER_TYPES.forEach(type => {
+    const raw = session?.[type] ?? {};
+    const durationSeconds = normalizeDiscussionDuration(
+      raw.durationSeconds,
+      state.discussionTimerDefaults[type]
+    );
+    normalized[type] = {
+      enabled: timerAllowed && raw.enabled !== false,
+      durationSeconds,
+      remainingSeconds: normalizeDiscussionRemaining(raw.remainingSeconds, durationSeconds)
+    };
+  });
+  return normalized;
+}
+
+function ensureDiscussionTimerSession(dayNum = state.dayNum) {
+  const sessionKey = String(Math.max(1, Number(dayNum) || 1));
+  if (!state.discussionTimerDefaults || typeof state.discussionTimerDefaults !== "object") {
+    state.discussionTimerDefaults = { public: DEFAULT_DISCUSSION_TIMER_SECONDS, private: DEFAULT_DISCUSSION_TIMER_SECONDS };
+  }
+  DISCUSSION_TIMER_TYPES.forEach(type => {
+    state.discussionTimerDefaults[type] = normalizeDiscussionDuration(state.discussionTimerDefaults[type]);
+  });
+  if (!state.discussionTimerSessions || typeof state.discussionTimerSessions !== "object") {
+    state.discussionTimerSessions = {};
+  }
+  if (!state.discussionTimerSessions[sessionKey]) {
+    state.discussionTimerSessions[sessionKey] = createDiscussionTimerSession();
+  } else if (DISCUSSION_TIMER_TYPES.some(type => {
+    const timer = state.discussionTimerSessions[sessionKey][type];
+    return !timer
+      || typeof timer.enabled !== "boolean"
+      || !Number.isFinite(Number(timer.durationSeconds))
+      || !Number.isFinite(Number(timer.remainingSeconds));
+  })) {
+    state.discussionTimerSessions[sessionKey] = normalizeDiscussionTimerSession(state.discussionTimerSessions[sessionKey]);
+  }
+  return state.discussionTimerSessions[sessionKey];
+}
+
+function normalizeDiscussionTimerState() {
+  const legacyDuration = normalizeDiscussionDuration(state.timerTotal);
+  const rawDefaults = state.discussionTimerDefaults;
+  state.discussionTimerDefaults = {
+    public: normalizeDiscussionDuration(rawDefaults?.public, legacyDuration),
+    private: normalizeDiscussionDuration(rawDefaults?.private, legacyDuration)
+  };
+
+  const rawSessions = state.discussionTimerSessions;
+  state.discussionTimerSessions = {};
+  if (rawSessions && typeof rawSessions === "object") {
+    Object.entries(rawSessions).forEach(([sessionKey, session]) => {
+      state.discussionTimerSessions[sessionKey] = normalizeDiscussionTimerSession(session);
+    });
+  }
+
+  state.activeDiscussionType = DISCUSSION_TIMER_TYPES.includes(state.activeDiscussionType)
+    ? state.activeDiscussionType
+    : "public";
+  const currentKey = String(Math.max(1, Number(state.dayNum) || 1));
+  const hadCurrentSession = Boolean(state.discussionTimerSessions[currentKey]);
+  const currentSession = ensureDiscussionTimerSession();
+  const activeTimer = currentSession[state.activeDiscussionType];
+  if (!hadCurrentSession) {
+    activeTimer.durationSeconds = legacyDuration;
+    activeTimer.remainingSeconds = normalizeDiscussionRemaining(state.timerSeconds, legacyDuration);
+    state.discussionTimerDefaults[state.activeDiscussionType] = legacyDuration;
+  }
+  state.timerTotal = activeTimer.durationSeconds;
+  state.timerSeconds = activeTimer.remainingSeconds;
+  state.timerRunning = false;
+  state.timerIntervalId = null;
+}
+
+function hydrateState(saved) {
+  Object.assign(state, saved);
+  if (!Object.prototype.hasOwnProperty.call(saved, "discussionTimerDefaults")) {
+    state.discussionTimerDefaults = null;
+  }
+  if (!Object.prototype.hasOwnProperty.call(saved, "discussionTimerSessions")) {
+    state.discussionTimerSessions = {};
+  }
+  if (!Object.prototype.hasOwnProperty.call(saved, "activeDiscussionType")) {
+    state.activeDiscussionType = "public";
+  }
+  state.timerRunning = false;
+  state.timerIntervalId = null;
+  normalizeDiscussionTimerState();
 }
 
 function resetEngine() {
@@ -226,6 +351,9 @@ function resetEngine() {
     timerTotal: 300,
     timerRunning: false,
     timerIntervalId: null,
+    discussionTimerDefaults: { public: 300, private: 300 },
+    discussionTimerSessions: {},
+    activeDiscussionType: "public",
     tab: "grimoire",
     confirm: null,
     showCard: null,
@@ -238,7 +366,7 @@ function resetEngine() {
 function resumeGame() {
   const saved = loadFromStorage();
   if (saved) {
-    Object.assign(state, saved);
+    hydrateState(saved);
     state.drunkBelievedRoles = saved.drunkBelievedRoles ?? {};
     state.redHerringIndex = saved.redHerringIndex ?? null;
     state.poisonedIndex = saved.poisonedIndex ?? null;
@@ -248,9 +376,6 @@ function resumeGame() {
       state.dist = { ...d };
     }
     state.showResume = false;
-    if (state.timerRunning) {
-      state.timerRunning = false; // pause on reload for safety
-    }
     const legacyDrunkNeedsSetup = state.scriptId === "tb"
       && getTroubleBrewingDrunkIndexes().some(playerIndex => !getDrunkBelievedRoleId(playerIndex));
     if (legacyDrunkNeedsSetup && ["reveal", "game", "victory"].includes(state.screen)) {
@@ -2051,6 +2176,7 @@ function proceedToDay() {
     badgeColor: "var(--border)"
   });
 
+  ensureDiscussionTimerSession();
   autoSave();
   render();
 }
@@ -2113,10 +2239,75 @@ function renderDayScreen() {
 
       <div style="margin-bottom:24px">${announcements}</div>
 
-      <button class="btn btn-primary" onclick="startTimerUI()">
-        ⏱ Start Discussion Timer (${formatTime(state.timerTotal)})
-      </button>
+      ${renderDiscussionTimerSetup()}
     </div>
+  `;
+}
+
+function canConfigureDiscussionTimers() {
+  return ["tb", "bmr", "sv"].includes(state.scriptId);
+}
+
+function discussionTypeLabel(type) {
+  return type === "private" ? "Private" : "Public";
+}
+
+function renderDiscussionTimerSetup() {
+  if (!canConfigureDiscussionTimers()) {
+    return `
+      <section class="timer-settings discussion-timer-disabled" aria-disabled="true">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:24px;filter:grayscale(1)">⏱</span>
+          <div style="flex:1;text-align:left">
+            <strong style="display:block;color:var(--text2);margin-bottom:3px">Discussion timers unavailable</strong>
+            <span style="font-size:12px;color:var(--text3)">Timer controls are disabled for Ultimate Werewolf.</span>
+          </div>
+          <button class="btn btn-outline" style="width:auto;margin:0" disabled aria-disabled="true">Disabled</button>
+        </div>
+      </section>
+    `;
+  }
+
+  const session = ensureDiscussionTimerSession();
+  const timerOptions = DISCUSSION_TIMER_TYPES.map(type => {
+    const timer = session[type];
+    const label = discussionTypeLabel(type);
+    const disabled = !timer.enabled;
+    return `
+      <div class="discussion-timer-option${disabled ? " is-disabled" : ""}">
+        <div class="discussion-timer-option-header">
+          <div style="text-align:left">
+            <strong>${label} discussion</strong>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">Day ${state.dayNum} timer</div>
+          </div>
+          <label class="discussion-timer-toggle">
+            <input type="checkbox" ${timer.enabled ? "checked" : ""} onchange="setDiscussionTimerEnabled('${type}', this.checked)">
+            <span>${timer.enabled ? "Enabled" : "Disabled"}</span>
+          </label>
+        </div>
+        <div class="timer-setting-row" style="margin:12px 0">
+          <span style="color:var(--text2)">Duration</span>
+          <div class="timer-adj">
+            <button class="timer-adj-btn" onclick="adjustDiscussionTimerDuration('${type}', -30)" ${disabled || timer.durationSeconds <= MIN_DISCUSSION_TIMER_SECONDS ? "disabled" : ""} aria-label="Reduce ${label.toLowerCase()} discussion timer by 30 seconds">−</button>
+            <span class="timer-adj-val">${formatTime(timer.durationSeconds)}</span>
+            <button class="timer-adj-btn" onclick="adjustDiscussionTimerDuration('${type}', 30)" ${disabled || timer.durationSeconds >= MAX_DISCUSSION_TIMER_SECONDS ? "disabled" : ""} aria-label="Increase ${label.toLowerCase()} discussion timer by 30 seconds">+</button>
+          </div>
+        </div>
+        <button class="btn ${disabled ? "btn-outline" : "btn-primary"}" style="margin:0" onclick="startTimerUI('${type}')" ${disabled ? "disabled" : ""}>
+          ⏱ Start ${label} Timer (${formatTime(timer.remainingSeconds)})
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <section class="timer-settings" aria-label="Discussion timer settings">
+      <div style="text-align:left;margin-bottom:12px">
+        <strong style="display:block;color:var(--text)">Discussion timers</strong>
+        <span style="font-size:12px;color:var(--text3)">Choose separate timers for this day's public and private discussions.</span>
+      </div>
+      <div class="discussion-timer-grid">${timerOptions}</div>
+    </section>
   `;
 }
 
@@ -2124,29 +2315,51 @@ function renderDayScreen() {
 // FLOW 7: DISCUSSION TIMER DIAL SCREEN (`Discussion Timer.png`)
 // ══════════════════════════════════════════════════════════════════════════
 function renderTimerScreen() {
+  if (!canConfigureDiscussionTimers()) {
+    return `
+      <div style="padding:16px;text-align:center">
+        <section class="timer-settings discussion-timer-disabled" aria-disabled="true">
+          <div style="font-size:32px;filter:grayscale(1);margin-bottom:8px">⏱</div>
+          <h3 style="font-family:var(--font-serif);margin-bottom:8px">Discussion timers unavailable</h3>
+          <p style="font-size:13px;color:var(--text3);margin-bottom:16px">Timer controls are disabled for Ultimate Werewolf.</p>
+          <button class="btn btn-outline" onclick="setTab('day')">Back to Town Square</button>
+        </section>
+      </div>
+    `;
+  }
+
+  const session = ensureDiscussionTimerSession();
+  const activeType = DISCUSSION_TIMER_TYPES.includes(state.activeDiscussionType) ? state.activeDiscussionType : "public";
+  const activeLabel = discussionTypeLabel(activeType);
   const pct = state.timerTotal > 0 ? (state.timerSeconds / state.timerTotal) * 100 : 0;
   
   // Math for circular ring dial
-  const radius = 80;
+  const center = 100;
+  const radius = 88;
   const stroke = 8;
-  const normalizedRadius = radius - stroke * 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
+  const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (pct / 100) * circumference;
 
   return `
     <div style="padding:16px;text-align:center">
       <div style="margin-bottom:20px">
         <h3 style="font-family:var(--font-serif);font-size:24px;margin-bottom:4px">Town Square</h3>
-        <p style="color:var(--text3);font-size:13px">${isUltimateWerewolf()
-          ? "Day Phase — public discussion only. Dead players cannot vote."
-          : "Day Phase — private/public discussions."}</p>
+        <p style="color:var(--text3);font-size:13px">Day ${state.dayNum} — ${activeLabel.toLowerCase()} discussion</p>
+      </div>
+
+      <div class="timer-phases" aria-label="Discussion type">
+        ${DISCUSSION_TIMER_TYPES.map(type => `
+          <button class="timer-phase-dot${type === activeType ? " current" : ""}" onclick="switchDiscussionTimer('${type}')" ${session[type].enabled ? "" : "disabled"}>
+            ${discussionTypeLabel(type)}
+          </button>
+        `).join("")}
       </div>
 
       <!-- Circular Timer Dial -->
       <div style="position:relative;width:200px;height:200px;margin:0 auto 28px;display:flex;align-items:center;justify-content:center">
-        <svg style="transform: rotate(-90deg);width:100%;height:100%">
-          <circle stroke="var(--border)" fill="transparent" stroke-width="${stroke}" r="${normalizedRadius}" cx="${radius}" cy="${radius}" style="transform: scale(1.25);transform-origin:center"/>
-          <circle id="discussion-timer-progress" stroke="var(--red)" fill="transparent" stroke-width="${stroke}" stroke-dasharray="${circumference} ${circumference}" style="stroke-dashoffset:${strokeDashoffset};transition: stroke-dashoffset 0.5s linear;transform: scale(1.25);transform-origin:center" r="${normalizedRadius}" cx="${radius}" cy="${radius}"/>
+        <svg viewBox="0 0 200 200" style="transform:rotate(-90deg);width:100%;height:100%;overflow:visible">
+          <circle stroke="var(--border)" fill="transparent" stroke-width="${stroke}" r="${radius}" cx="${center}" cy="${center}"/>
+          <circle id="discussion-timer-progress" stroke="var(--red)" fill="transparent" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${circumference} ${circumference}" style="stroke-dashoffset:${strokeDashoffset};transition:stroke-dashoffset 0.5s linear" r="${radius}" cx="${center}" cy="${center}"/>
         </svg>
         <div style="position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center">
           <span id="discussion-timer-display" role="timer" aria-live="off" style="font-size:36px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:5ch">${formatTime(state.timerSeconds)}</span>
@@ -2157,19 +2370,19 @@ function renderTimerScreen() {
       <!-- Timer controls -->
       <div style="display:flex;justify-content:center;gap:20px;margin-bottom:28px">
         <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="adjustTimerVal(30)">+</button>
+          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="adjustTimerVal(30)" aria-label="Add 30 seconds to ${activeLabel.toLowerCase()} discussion timer">+</button>
           <span style="font-size:11px;color:var(--text3)">Add 30s</span>
         </div>
         
         <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-          <button id="discussion-timer-toggle" class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="toggleTimerRunning()" aria-label="${state.timerRunning ? 'Pause' : 'Start'} discussion timer">
+          <button id="discussion-timer-toggle" class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%" onclick="toggleTimerRunning()" aria-label="${state.timerRunning ? 'Pause' : 'Start'} ${activeLabel.toLowerCase()} discussion timer">
             ${state.timerRunning ? '⏸' : '▶'}
           </button>
           <span id="discussion-timer-toggle-label" style="font-size:11px;color:var(--text3)">${state.timerRunning ? 'Pause' : 'Start'}</span>
         </div>
 
         <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%;color:var(--red);border-color:var(--red)33" onclick="resetTimerVal()">■</button>
+          <button class="timer-adj-btn" style="width:42px;height:42px;border-radius:50%;color:var(--red);border-color:var(--red)33" onclick="resetTimerVal()" aria-label="Reset ${activeLabel.toLowerCase()} discussion timer">■</button>
           <span style="font-size:11px;color:var(--text3)">Reset</span>
         </div>
       </div>
@@ -2190,14 +2403,84 @@ function renderTimerScreen() {
   `;
 }
 
-function startTimerUI() {
+function getDiscussionTimer(type = state.activeDiscussionType) {
+  if (!DISCUSSION_TIMER_TYPES.includes(type)) return null;
+  return ensureDiscussionTimerSession()[type];
+}
+
+function syncActiveDiscussionTimer(updateDefault = false) {
+  const timer = getDiscussionTimer();
+  if (!timer) return;
+  timer.durationSeconds = normalizeDiscussionDuration(state.timerTotal, timer.durationSeconds);
+  timer.remainingSeconds = normalizeDiscussionRemaining(state.timerSeconds, timer.durationSeconds);
+  if (updateDefault) state.discussionTimerDefaults[state.activeDiscussionType] = timer.durationSeconds;
+}
+
+function setDiscussionTimerEnabled(type, enabled) {
+  if (!canConfigureDiscussionTimers() || !DISCUSSION_TIMER_TYPES.includes(type)) return;
+  const timer = getDiscussionTimer(type);
+  if (!timer) return;
+  timer.enabled = Boolean(enabled);
+  if (!timer.enabled && state.activeDiscussionType === type) {
+    stopTimer();
+    if (state.tab === "timer") state.tab = "day";
+  }
+  autoSave();
+  render();
+}
+
+function adjustDiscussionTimerDuration(type, seconds) {
+  if (!canConfigureDiscussionTimers() || !DISCUSSION_TIMER_TYPES.includes(type)) return;
+  const timer = getDiscussionTimer(type);
+  if (!timer?.enabled) return;
+  const nextDuration = normalizeDiscussionDuration(timer.durationSeconds + seconds, timer.durationSeconds);
+  if (nextDuration === timer.durationSeconds) return;
+  if (state.activeDiscussionType === type) stopTimer();
+  timer.durationSeconds = nextDuration;
+  timer.remainingSeconds = nextDuration;
+  state.discussionTimerDefaults[type] = nextDuration;
+  if (state.activeDiscussionType === type) {
+    state.timerTotal = nextDuration;
+    state.timerSeconds = nextDuration;
+  }
+  autoSave();
+  render();
+}
+
+function switchDiscussionTimer(type) {
+  if (!canConfigureDiscussionTimers() || !DISCUSSION_TIMER_TYPES.includes(type)) return;
+  const timer = getDiscussionTimer(type);
+  if (!timer?.enabled || state.activeDiscussionType === type) return;
+  stopTimer();
+  state.activeDiscussionType = type;
+  state.timerTotal = timer.durationSeconds;
+  state.timerSeconds = timer.remainingSeconds;
+  autoSave();
+  render();
+}
+
+function startTimerUI(type = state.activeDiscussionType) {
+  if (!canConfigureDiscussionTimers() || !DISCUSSION_TIMER_TYPES.includes(type)) return;
+  const timer = getDiscussionTimer(type);
+  if (!timer?.enabled) return;
+  stopTimer();
+  state.activeDiscussionType = type;
+  state.timerTotal = timer.durationSeconds;
+  state.timerSeconds = timer.remainingSeconds;
   state.tab = "timer";
   startTimerTicker();
+  autoSave();
   render();
 }
 
 function startTimerTicker() {
   clearTimerInterval();
+  const timer = getDiscussionTimer();
+  if (!canConfigureDiscussionTimers() || !timer?.enabled) {
+    state.timerRunning = false;
+    updateTimerDisplay();
+    return;
+  }
   if (state.timerSeconds <= 0) {
     state.timerRunning = false;
     updateTimerDisplay();
@@ -2212,6 +2495,7 @@ function startTimerTicker() {
         clearTimerInterval();
         playAlarmAudio();
       }
+      syncActiveDiscussionTimer();
       autoSave();
       updateTimerDisplay();
     }
@@ -2219,9 +2503,14 @@ function startTimerTicker() {
 }
 
 function toggleTimerRunning() {
+  if (!canConfigureDiscussionTimers() || !getDiscussionTimer()?.enabled) return;
   if (state.timerRunning) {
     stopTimer();
   } else {
+    if (state.timerSeconds <= 0) {
+      state.timerSeconds = state.timerTotal;
+      syncActiveDiscussionTimer();
+    }
     startTimerTicker();
   }
   autoSave();
@@ -2229,16 +2518,24 @@ function toggleTimerRunning() {
 }
 
 function adjustTimerVal(seconds) {
-  state.timerSeconds += seconds;
-  state.timerTotal = Math.max(state.timerTotal, state.timerSeconds);
+  if (!canConfigureDiscussionTimers() || !getDiscussionTimer()?.enabled) return;
+  const previousSeconds = state.timerSeconds;
+  state.timerSeconds = Math.max(0, Math.min(MAX_DISCUSSION_TIMER_SECONDS, state.timerSeconds + seconds));
+  const appliedSeconds = state.timerSeconds - previousSeconds;
+  state.timerTotal = normalizeDiscussionDuration(state.timerTotal + Math.max(0, appliedSeconds), state.timerTotal);
+  syncActiveDiscussionTimer(true);
   autoSave();
   render();
 }
 
 function resetTimerVal() {
+  if (!canConfigureDiscussionTimers()) return;
+  const timer = getDiscussionTimer();
+  if (!timer?.enabled) return;
   stopTimer();
-  state.timerSeconds = 300;
-  state.timerTotal = 300;
+  state.timerTotal = timer.durationSeconds;
+  state.timerSeconds = timer.durationSeconds;
+  syncActiveDiscussionTimer();
   autoSave();
   render();
 }
@@ -2253,6 +2550,7 @@ function clearTimerInterval() {
 function stopTimer() {
   state.timerRunning = false;
   clearTimerInterval();
+  if (canConfigureDiscussionTimers()) syncActiveDiscussionTimer();
 }
 
 function updateTimerDisplay() {
@@ -2261,14 +2559,13 @@ function updateTimerDisplay() {
   const toggle = document.getElementById("discussion-timer-toggle");
   const toggleLabel = document.getElementById("discussion-timer-toggle-label");
   const pct = state.timerTotal > 0 ? Math.max(0, Math.min(1, state.timerSeconds / state.timerTotal)) : 0;
-  const normalizedRadius = 80 - 8 * 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
+  const circumference = 88 * 2 * Math.PI;
 
   if (display) display.textContent = formatTime(state.timerSeconds);
   if (progress) progress.style.strokeDashoffset = String(circumference - pct * circumference);
   if (toggle) {
     toggle.textContent = state.timerRunning ? '⏸' : '▶';
-    toggle.setAttribute("aria-label", `${state.timerRunning ? "Pause" : "Start"} discussion timer`);
+    toggle.setAttribute("aria-label", `${state.timerRunning ? "Pause" : "Start"} ${discussionTypeLabel(state.activeDiscussionType).toLowerCase()} discussion timer`);
   }
   if (toggleLabel) toggleLabel.textContent = state.timerRunning ? "Pause" : "Start";
 }

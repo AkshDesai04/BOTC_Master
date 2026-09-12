@@ -25,7 +25,7 @@
   try {
     const saved = loadFromStorage();
     if (saved && saved._saved) {
-      Object.assign(state, saved);
+      hydrateState(saved);
       state.showResume = true;
     } else {
       state.screen = "select";

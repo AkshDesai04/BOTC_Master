@@ -712,6 +712,55 @@ input[type="range"]::-webkit-slider-thumb:hover {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+.discussion-timer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.discussion-timer-option {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+.discussion-timer-option.is-disabled,
+.discussion-timer-disabled {
+  opacity: 0.58;
+  filter: saturate(0.55);
+}
+.discussion-timer-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.discussion-timer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.discussion-timer-toggle input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--red);
+}
+.btn:disabled,
+.timer-adj-btn:disabled,
+.timer-phase-dot:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+@media (max-width: 560px) {
+  .discussion-timer-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ── SELECTION BUTTONS (Night Walker) ── */
 .ns-grid {
