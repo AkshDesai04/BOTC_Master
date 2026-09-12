@@ -757,7 +757,7 @@
 
   function scriptRange(scriptId) {
     if (scriptId === "uw") return { min: 5, max: 75 };
-    if (scriptId === "tb") return { min: 5, max: 20 };
+    if (["tb", "bmr", "sv"].includes(scriptId)) return { min: 5, max: 20 };
     return { min: 5, max: 15 };
   }
 

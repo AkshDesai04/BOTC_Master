@@ -28,7 +28,6 @@ function scriptById(scriptId) {
   if (scriptId === "tb" && typeof TB !== "undefined") return TB;
   if (scriptId === "bmr" && typeof BMR !== "undefined") return BMR;
   if (scriptId === "sv" && typeof SV !== "undefined") return SV;
-  if (scriptId === "uw" && typeof UW !== "undefined") return UW;
   if (typeof TB !== "undefined") return TB;
   return { id: scriptId ?? null, name: "Game", C: {}, FIRST_NIGHT: [], OTHER_NIGHT: [] };
 }
@@ -977,14 +976,6 @@ function renderSelectScreen() {
       desc: "Madness and misinformation rule. A highly complex script where alignments shift and information is rarely what it seems.",
       tag: "High madness and information control"
     },
-    {
-      id: "uw",
-      name: "Ultimate Werewolf",
-      icon: "wolf",
-      color: "#b7b8bd",
-      desc: "Record the physical deck, guide night wakes, and manually resolve the many team and solo victory conditions.",
-      tag: "Moderator physical-card mode"
-    }
   ];
 
   let cards = "";
@@ -1015,7 +1006,7 @@ function renderSelectScreen() {
 }
 
 function pickScript(id) {
-  if (!["tb", "bmr", "sv", "uw"].includes(id)) return;
+  if (!["tb", "bmr", "sv"].includes(id)) return;
   const changedScript = state.scriptId && state.scriptId !== id;
   state.scriptId = id;
   state.screen = "count";
@@ -1124,7 +1115,15 @@ function renderCountScreen() {
       </div>
       `}
 
-      <button class="btn btn-primary" ${mismatch ? 'disabled' : ''} onclick="proceedToNames()">Proceed to Player Roster ${iconSvg("forward", 17)}</button>
+      <div class="card" style="padding:16px;border-radius:12px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Import roster</div>
+        <p style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px">Load player names from a CSV or image. You can add, remove, and rename seats before continuing.</p>
+        <input type="file" id="player-import-file" accept=".csv,text/csv,image/png,image/jpeg" style="display:none" onchange="handlePlayerImportFile(event)">
+        <button type="button" class="btn-outline" style="width:100%" onclick="document.getElementById('player-import-file').click()" ${state.playerImportBusy ? "disabled" : ""}>
+          ${iconSvg("upload", 17)} ${state.playerImportBusy ? "Reading roster…" : "Import CSV or image"}
+        </button>
+      </div>
+      <button class="btn btn-primary" ${mismatch || state.playerImportBusy ? 'disabled' : ''} onclick="proceedToNames()">Proceed to Player Roster ${iconSvg("forward", 17)}</button>
       <button class="btn-outline" style="margin-top:10px;width:100%" onclick="goToScreen('select')">${iconSvg("back", 17)} Back to Scripts</button>
     </div>
   `;
@@ -1134,8 +1133,9 @@ function adjDist(type, delta) {
   const s = S();
   // Get available characters for this script
   const availableCount = Object.values(s.C).filter(c => c.type === (type === 't' ? 'townsfolk' : type === 'o' ? 'outsider' : type === 'm' ? 'minion' : 'demon')).length;
+  const distributionLimit = Number(s.DIST?.[state.playerCount]?.[type]) || 0;
   const min = type === 'd' ? 1 : 0;
-  state.dist[type] = Math.max(min, Math.min(availableCount, (state.dist[type] || 0) + delta));
+  state.dist[type] = Math.max(min, Math.min(Math.max(availableCount, distributionLimit), (state.dist[type] || 0) + delta));
   state.rolePool = [];
   state.assignments = {};
   state.setupChoices = {};
@@ -1190,6 +1190,7 @@ function renderNamesScreen() {
           placeholder="Enter player name..." 
           oninput="savePlayerName(${i}, this.value)"
           onkeydown="if(event.key==='Enter') focusNextName(${i})">
+        <button type="button" class="timer-adj-btn compact-adjust" aria-label="Remove player at seat ${i + 1}" onclick="removeRosterPlayer(${i})" ${state.playerCount <= (S().playerLimits?.min ?? 5) ? "disabled" : ""}>${iconSvg("close", 14)}</button>
       </div>
     `;
   }
@@ -1207,6 +1208,7 @@ function renderNamesScreen() {
       <div class="card" style="padding:16px;border-radius:12px;margin-bottom:24px">
         <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:12px">PLAYER ROSTER</div>
         ${roster}
+        <button type="button" class="btn-outline" style="width:100%;margin-top:4px" onclick="addRosterPlayer()" ${state.playerCount >= (S().playerLimits?.max ?? 20) ? "disabled" : ""}>${iconSvg("users", 16)} Add player</button>
       </div>
 
       <button class="btn btn-primary" onclick="proceedToRoles()">Continue to Roles ${iconSvg("forward", 17)}</button>
@@ -1229,6 +1231,28 @@ function savePlayerName(idx, val) {
 function focusNextName(idx) {
   const next = document.getElementById(`name-input-${idx + 1}`);
   if (next) next.focus();
+}
+
+function addRosterPlayer() {
+  const script = S();
+  if (state.playerCount >= (script.playerLimits?.max ?? 20)) return;
+  state.playerCount += 1;
+  state.names.push("");
+  state.dist = { ...(script.DIST[state.playerCount] || state.dist) };
+  clearRoleSetupForRosterChange();
+  autoSave();
+  render();
+}
+
+function removeRosterPlayer(index) {
+  const script = S();
+  if (state.playerCount <= (script.playerLimits?.min ?? 5) || index < 0 || index >= state.playerCount) return;
+  state.names.splice(index, 1);
+  state.playerCount -= 1;
+  state.dist = { ...(script.DIST[state.playerCount] || state.dist) };
+  clearRoleSetupForRosterChange();
+  autoSave();
+  render();
 }
 
 function validGodfatherOutsiderDeltas(baseDistribution = state.dist) {
@@ -1331,15 +1355,20 @@ function proceedToRoles() {
   const mnKeys = Object.keys(chars).filter(k => chars[k].type === "minion");
   const dmKeys = Object.keys(chars).filter(k => chars[k].type === "demon");
 
-  // Pick correct count randomly
-  const chosenMN = shuffle(mnKeys).slice(0, d.m);
-  const chosenDM = shuffle(dmKeys).slice(0, d.d ?? 1);
+  // Pick the requested role count. The 19- and 20-player distributions use a
+  // second copy of one Minion because a base script contains four Minion roles.
+  const chooseRoleCopies = (roleIds, count) => {
+    const shuffled = shuffle(roleIds);
+    return Array.from({ length: count }, (_, index) => shuffled[index % shuffled.length]);
+  };
+  const chosenMN = chooseRoleCopies(mnKeys, d.m);
+  const chosenDM = chooseRoleCopies(dmKeys, d.d ?? 1);
   ensureSetupChoices([...chosenMN, ...chosenDM]);
   const adjustedDistribution = getSetupAdjustedDistribution(d, [...chosenMN, ...chosenDM]);
   const townsfolkCount = adjustedDistribution.t;
   const outsiderCount = adjustedDistribution.o;
-  const chosenTF = shuffle(tfKeys).slice(0, townsfolkCount);
-  const chosenOS = shuffle(osKeys).slice(0, outsiderCount);
+  const chosenTF = chooseRoleCopies(tfKeys, townsfolkCount);
+  const chosenOS = chooseRoleCopies(osKeys, outsiderCount);
 
   state.rolePool = [...chosenTF, ...chosenOS, ...chosenMN, ...chosenDM];
   
@@ -1598,6 +1627,133 @@ function setLunaticBelievedRole(playerIndex, roleId) {
   normalizeLunaticSetupState();
   autoSave();
   render();
+}
+
+function clearRoleSetupForRosterChange() {
+  state.rolePool = [];
+  state.assignments = {};
+  state.setupChoices = {};
+  state.drunkBelievedRoles = {};
+  state.lunaticBelievedRoles = {};
+  state.lunaticPoCharged = {};
+  state.redHerringIndex = null;
+}
+
+function rosterFileExtension(fileName) {
+  const parts = String(fileName ?? "").toLowerCase().split(".");
+  return parts.length > 1 ? parts.at(-1) : "";
+}
+
+function parseCsvRows(source) {
+  const rows = [[]];
+  let value = "";
+  let quoted = false;
+  const input = String(source ?? "").replace(/^\uFEFF/, "");
+  for (let index = 0; index < input.length; index++) {
+    const character = input[index];
+    if (character === '"') {
+      if (quoted && input[index + 1] === '"') {
+        value += '"';
+        index++;
+      } else quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      rows.at(-1).push(value);
+      value = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && input[index + 1] === "\n") index++;
+      rows.at(-1).push(value);
+      rows.push([]);
+      value = "";
+    } else value += character;
+  }
+  rows.at(-1).push(value);
+  return rows.filter(row => row.some(cell => String(cell).trim() !== ""));
+}
+
+function normalizeImportedNames(values) {
+  const seen = new Set();
+  return values.reduce((names, value) => {
+    const name = String(value ?? "")
+      .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80);
+    const identity = name.normalize("NFKC").toLocaleLowerCase();
+    if (!name || seen.has(identity)) return names;
+    seen.add(identity);
+    names.push(name);
+    return names;
+  }, []);
+}
+
+function parseCsvRoster(source) {
+  const rows = parseCsvRows(source).map(row => row.map(cell => String(cell).trim()));
+  if (!rows.length) return [];
+  const headerIndex = rows[0].findIndex(cell => /^(?:(?:player\s*)?name|guest)$/i.test(cell));
+  const firstColumnLooksNumbered = rows.slice(headerIndex >= 0 ? 1 : 0).every(row => /^\d+$/.test(row[0] ?? ""));
+  const nameColumn = headerIndex >= 0 ? headerIndex : (firstColumnLooksNumbered ? 1 : 0);
+  return normalizeImportedNames(rows.slice(headerIndex >= 0 ? 1 : 0).map(row => row[nameColumn]));
+}
+
+async function readRosterImageText(file) {
+  if (typeof window.TextDetector !== "function" || typeof createImageBitmap !== "function") {
+    throw new Error("Image text extraction is not available in this browser. Import a CSV instead.");
+  }
+  const bitmap = await createImageBitmap(file);
+  try {
+    const detections = await new window.TextDetector().detect(bitmap);
+    return detections
+      .sort((left, right) => (left.boundingBox?.y ?? 0) - (right.boundingBox?.y ?? 0) || (left.boundingBox?.x ?? 0) - (right.boundingBox?.x ?? 0))
+      .map(result => result.rawValue)
+      .join("\n");
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+function applyImportedPlayerNames(names) {
+  const script = S();
+  const minimumPlayers = script.playerLimits?.min ?? 5;
+  const maximumPlayers = script.playerLimits?.max ?? 20;
+  const wasTrimmed = names.length > maximumPlayers;
+  const imported = names.slice(0, maximumPlayers);
+  if (!imported.length) throw new Error("No player names were found in that file.");
+  state.playerCount = Math.max(minimumPlayers, imported.length);
+  state.names = [...imported];
+  while (state.names.length < state.playerCount) state.names.push("");
+  state.dist = { ...(script.DIST[state.playerCount] || { t: 0, o: 0, m: 0, d: 1 }) };
+  clearRoleSetupForRosterChange();
+  state.screen = "names";
+  autoSave();
+  showToast(wasTrimmed ? `Imported the first ${maximumPlayers} names.` : `Imported ${imported.length} player${imported.length === 1 ? "" : "s"}.`, "success");
+}
+
+async function handlePlayerImportFile(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+  if (input) input.value = "";
+  if (!file) return;
+  const extension = rosterFileExtension(file.name);
+  if (!["csv", "png", "jpg", "jpeg"].includes(extension)) {
+    showToast("Choose a CSV, PNG, JPG, or JPEG roster file.", "error");
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    showToast("The roster file must be 8 MB or smaller.", "error");
+    return;
+  }
+  state.playerImportBusy = true;
+  render();
+  try {
+    const names = extension === "csv"
+      ? parseCsvRoster(await file.text())
+      : normalizeImportedNames((await readRosterImageText(file)).split(/\r?\n/));
+    state.playerImportBusy = false;
+    applyImportedPlayerNames(names);
+  } catch (error) {
+    state.playerImportBusy = false;
+    showToast(error?.message ? `Roster import failed: ${error.message}` : "Roster import failed.", "error");
+  }
 }
 
 function renderLunaticBeliefPicker(playerIndex) {
@@ -1958,12 +2114,14 @@ function editPlayerRole(playerIdx) {
     const c = chars[rid];
     const inPool = state.rolePool.includes(rid);
     const currentRole = state.assignments[playerIdx];
-    const assignedElsewhere = Object.entries(state.assignments).some(([index, assignedRoleId]) => Number(index) !== Number(playerIdx) && assignedRoleId === rid);
+    const assignedElsewhere = Object.entries(state.assignments).filter(([index, assignedRoleId]) => Number(index) !== Number(playerIdx) && assignedRoleId === rid).length;
     const unavailableOutsidePool = !currentRole && !inPool;
+    const availableCopies = state.rolePool.filter(roleId => roleId === rid).length;
+    const lacksAvailableCopy = assignedElsewhere >= availableCopies;
     const badge = inPool ? `<span style="font-size:9px;background:rgba(255,255,255,0.05);color:var(--text3);padding:2px 4px;border-radius:3px">Pool</span>` : "";
 
     optionsHtml += `
-      <button class="btn" style="text-align:left;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);justify-content:space-between;margin-bottom:6px" ${assignedElsewhere || unavailableOutsidePool ? "disabled" : ""}
+      <button class="btn" style="text-align:left;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);justify-content:space-between;margin-bottom:6px" ${lacksAvailableCopy || unavailableOutsidePool ? "disabled" : ""}
         onclick="assignRoleToPlayer(${playerIdx}, '${rid}');state.showCard=null;render()">
         <span style="display:flex;align-items:center;gap:8px">
           ${renderRoleImage(c.id, c.type, 20)}
@@ -1985,9 +2143,10 @@ function editPlayerRole(playerIdx) {
 
 function assignRoleToPlayer(pIdx, rid) {
   if (!S().C[rid]) return;
-  const assignedElsewhere = Object.entries(state.assignments).some(([index, assignedRoleId]) => Number(index) !== Number(pIdx) && assignedRoleId === rid);
-  if (assignedElsewhere) {
-    showToast("That character is already assigned to another seat.", "error");
+  const assignedElsewhere = Object.entries(state.assignments).filter(([index, assignedRoleId]) => Number(index) !== Number(pIdx) && assignedRoleId === rid).length;
+  const availableCopies = state.rolePool.filter(roleId => roleId === rid).length;
+  if (assignedElsewhere >= availableCopies) {
+    showToast("Every selected copy of that character is already assigned.", "error");
     return;
   }
   const oldRole = state.assignments[pIdx];
@@ -2025,6 +2184,10 @@ function openPoolEditor() {
   Object.keys(chars).forEach(rid => {
     const c = chars[rid];
     const selected = state.rolePool.includes(rid);
+    const selectedCount = state.rolePool.filter(roleId => roleId === rid).length;
+    const copyControl = state.playerCount > 15
+      ? `<select class="input" aria-label="${esc(c.name)} copies" style="width:58px;padding:3px 5px;font-size:12px" onchange="setPoolRoleCount('${rid}', this.value)"><option value="0" ${selectedCount === 0 ? "selected" : ""}>0</option><option value="1" ${selectedCount === 1 ? "selected" : ""}>1</option><option value="2" ${selectedCount >= 2 ? "selected" : ""}>2</option></select>`
+      : `<input type="checkbox" aria-label="Include ${esc(c.name)} in the role pool" ${selected ? 'checked' : ''} onchange="togglePoolRole('${rid}', this.checked)">`;
     
     listHtml += `
       <label class="pool-role-option">
@@ -2032,7 +2195,7 @@ function openPoolEditor() {
           ${renderRoleImage(c.id, c.type, 18)}
           <span style="color:${TYPE_CLR[c.type].txt};font-size:13px">${c.name}</span>
         </span>
-        <input type="checkbox" aria-label="Include ${esc(c.name)} in the role pool" ${selected ? 'checked' : ''} onchange="togglePoolRole('${rid}', this.checked)">
+        ${copyControl}
       </label>
     `;
   });
@@ -2065,6 +2228,15 @@ function showToast(message, tone = "info") {
       render();
     }
   }, 4500);
+}
+
+function setPoolRoleCount(rid, value) {
+  const count = Math.max(0, Math.min(2, Number.parseInt(value, 10) || 0));
+  state.rolePool = [
+    ...state.rolePool.filter(roleId => roleId !== rid),
+    ...Array.from({ length: count }, () => rid)
+  ];
+  autoSave();
 }
 
 function createSessionId() {
@@ -3505,7 +3677,8 @@ function validateRoleSetup() {
       names: state.names,
       assignments: state.assignments,
       rolePool: state.rolePool,
-      distribution
+      distribution,
+      allowDuplicateRoles: state.playerCount > 15
     });
     return result.errors.map(error => error.message);
   }
@@ -3515,9 +3688,9 @@ function validateRoleSetup() {
   if (assigned.some(roleId => !roleId)) errors.push("Assign a character to every seat.");
   if (assigned.some(roleId => roleId && !validRoleIds.has(roleId))) errors.push("One or more assigned characters are invalid for this script.");
   const nonEmptyAssignments = assigned.filter(Boolean);
-  if (new Set(nonEmptyAssignments).size !== nonEmptyAssignments.length) errors.push("Each character may appear only once.");
-  if (state.rolePool.length !== state.playerCount || new Set(state.rolePool).size !== state.rolePool.length) {
-    errors.push(`The role pool must contain exactly ${state.playerCount} unique characters.`);
+  if (state.playerCount <= 15 && new Set(nonEmptyAssignments).size !== nonEmptyAssignments.length) errors.push("Each character may appear only once.");
+  if (state.rolePool.length !== state.playerCount || (state.playerCount <= 15 && new Set(state.rolePool).size !== state.rolePool.length)) {
+    errors.push(`The role pool must contain exactly ${state.playerCount} ${state.playerCount <= 15 ? "unique " : ""}characters.`);
   }
   const poolSet = new Set(state.rolePool);
   if (nonEmptyAssignments.some(roleId => !poolSet.has(roleId))) errors.push("Assigned characters must match the selected role pool.");

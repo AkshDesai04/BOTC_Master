@@ -82,6 +82,9 @@ test("standard script data has internally consistent roles and distributions", (
       }
     }
 
+    assert.equal(script.playerLimits.max, 20, `${script.id} supports 20 players`);
+    assert.deepEqual(script.DIST[20], { t: 13, o: 1, m: 5, d: 1 }, `${script.id} has the 20-player distribution`);
+
     assertNightOrderIntegrity(script, "first night", script.FIRST_NIGHT);
     assertNightOrderIntegrity(script, "other night", script.OTHER_NIGHT);
   }

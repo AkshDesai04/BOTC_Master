@@ -109,6 +109,23 @@ test("the game lifecycle emits only the three supported email events", () => {
   assert.equal(evaluate("new Set(dispatchedEvents).size"), 3);
 });
 
+test("CSV roster imports preserve names for editable setup and fill the minimum seats", () => {
+  const evaluate = createHarness();
+  evaluate(`
+    state.scriptId = "tb";
+    state.playerCount = 8;
+    state.dist = { t: 5, o: 1, m: 1, d: 1 };
+    globalThis.importedNames = JSON.stringify(parseCsvRoster('Seat,Player Name\\n1,Ada\\n2,"Bea, Jr."\\n3,Ada'));
+    applyImportedPlayerNames(JSON.parse(importedNames));
+  `);
+  assert.equal(evaluate("importedNames"), '["Ada","Bea, Jr."]');
+  assert.equal(evaluate("state.playerCount"), 5);
+  assert.equal(evaluate("JSON.stringify(state.names)"), '["Ada","Bea, Jr.","","",""]');
+  evaluate("addRosterPlayer(); removeRosterPlayer(1);");
+  assert.equal(evaluate("state.playerCount"), 5);
+  assert.equal(evaluate("JSON.stringify(state.names)"), '["Ada","","","",""]');
+});
+
 test("once-per-game characters leave the wake list after their ability is recorded", () => {
   const evaluate = createHarness();
   evaluate(`

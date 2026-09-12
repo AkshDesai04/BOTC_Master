@@ -54,7 +54,6 @@ test("the main static entry loads dependencies in application order and keeps br
     "scripts/trouble_brewing.js",
     "scripts/bad_moon_rising.js",
     "scripts/sects_and_violets.js",
-    "scripts/ultimate_werewolf.js",
     "scripts/handoff-qr.js",
     "scripts/common.js",
     "scripts/handoff.js"
@@ -62,7 +61,7 @@ test("the main static entry loads dependencies in application order and keeps br
 });
 
 test("script query routes are allow-listed and never replace a saved session", () => {
-  for (const scriptId of ["tb", "bmr", "sv", "uw"]) {
+  for (const scriptId of ["tb", "bmr", "sv"]) {
     const result = runBootstrap(`?script=${scriptId}`, null);
     assert.deepEqual(result.calls.picked, [scriptId]);
     assert.deepEqual(result.calls.hydrated, []);
@@ -73,6 +72,10 @@ test("script query routes are allow-listed and never replace a saved session", (
   assert.deepEqual(invalid.calls.picked, []);
   assert.equal(invalid.state.screen, "select");
   assert.equal(invalid.calls.renders, 1);
+
+  const removed = runBootstrap("?script=uw", null);
+  assert.deepEqual(removed.calls.picked, []);
+  assert.equal(removed.state.screen, "select");
 
   const saved = { _saved: 123, scriptId: "bmr", screen: "game" };
   const resume = runBootstrap("?script=tb", saved);

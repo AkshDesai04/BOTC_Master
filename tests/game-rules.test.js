@@ -125,6 +125,27 @@ test("setup validation honors explicit quantities and effective distributions", 
   assert.equal(result.valid, true);
 });
 
+test("large standard rosters can use a repeated character when explicitly enabled", () => {
+  const script = {
+    C: {
+      town: { id: "town", name: "Town", type: "townsfolk" },
+      minion: { id: "minion", name: "Minion", type: "minion" },
+      demon: { id: "demon", name: "Demon", type: "demon" }
+    },
+    DIST: { 19: { t: 13, o: 0, m: 5, d: 1 } }
+  };
+  const roles = [...Array(13).fill("town"), ...Array(5).fill("minion"), "demon"];
+  const setup = {
+    script,
+    playerCount: 19,
+    names: Array.from({ length: 19 }, (_, index) => `Player ${index + 1}`),
+    assignments: Object.fromEntries(roles.map((roleId, seat) => [seat, roleId])),
+    rolePool: roles
+  };
+  assert.equal(validateSetup(setup).valid, false);
+  assert.equal(validateSetup({ ...setup, allowDuplicateRoles: true }).valid, true);
+});
+
 test("wake expansion resolves a demon placeholder and filters dead characters", () => {
   const characters = {
     sailor: { id: "sailor", type: "townsfolk" },

@@ -51,7 +51,6 @@ jobs:
             scripts/trouble_brewing.js \
             scripts/bad_moon_rising.js \
             scripts/sects_and_violets.js \
-            scripts/ultimate_werewolf.js \
             scripts/handoff-qr.js \
             scripts/common.js \
             scripts/handoff.js \
