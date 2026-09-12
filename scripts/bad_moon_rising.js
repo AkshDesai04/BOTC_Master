@@ -26,9 +26,9 @@ const BMR_C = {
     on_r:"Chambermaid points to 2 players. Show fingers for how many of them woke tonight due to their ability."},
   exorcist:{
     id:"exorcist", name:"Exorcist", team:"good", type:"townsfolk", fn:0, on:8,
-    ab:"Each night*, choose a player (different from last night): if they are the Demon, they don't wake tonight.",
+    ab:"Each night*, choose a player (different to last night): the Demon, if chosen, learns who you are then doesn't wake tonight.",
     fn_r:"",
-    on_r:"Exorcist points to a player. If the Demon: they do not wake tonight."},
+    on_r:"Exorcist points to a player. If chosen, wake the Demon, show the Exorcist token and point to the Exorcist, but do not let the Demon act."},
   innkeeper:{
     id:"innkeeper", name:"Innkeeper", team:"good", type:"townsfolk", fn:0, on:3,
     ab:"Each night*, choose 2 players: they can't die tonight, but 1 is drunk until dusk.",
@@ -88,8 +88,8 @@ const BMR_C = {
   lunatic:{
     id:"lunatic", name:"Lunatic", team:"good", type:"outsider", fn:1, on:7,
     ab:"You think you are a Demon, but you are not. The Demon knows who you are & who you choose at night.",
-    fn_r:"Show fake Minion info + 3 bluffs as if they are the Demon.",
-    on_r:"Let the Lunatic act as the Demon. Show choices to real Demon."},
+    fn_r:"At 7+ players, show fake Minion info and 3 bluffs as if they are the Demon. Resolve the night action of the Demon they believe they are, then show their choices to the real Demon.",
+    on_r:"Resolve the night action of the Demon the Lunatic believes they are, then show their choices to the real Demon."},
   // ─── MINIONS (4) ───
   godfather:{
     id:"godfather", name:"Godfather", team:"evil", type:"minion", fn:6, on:11,
@@ -108,7 +108,7 @@ const BMR_C = {
     on_r:"Once per game: Assassin may choose a player — they die. Bypasses ALL protection."},
   mastermind:{
     id:"mastermind", name:"Mastermind", team:"evil", type:"minion", fn:0, on:0,
-    ab:"If the Demon dies by execution (not the Imp), play for 1 more day. If a player is then executed, their team loses.",
+    ab:"If the Demon dies by execution (ending the game), play for 1 more day. If a player is then executed, their team loses.",
     fn_r:"",on_r:""},
   // ─── DEMONS (4) ───
   zombuul:{
@@ -120,7 +120,7 @@ const BMR_C = {
     id:"pukka", name:"Pukka", team:"evil", type:"demon", fn:8, on:9,
     ab:"Each night, choose a player: they are poisoned. The previously poisoned player dies then becomes healthy.",
     fn_r:"Pukka points to a player — that player is poisoned.",
-    on_r:"The previously poisoned player dies. Pukka points to a new player — they are poisoned."},
+    on_r:"Pukka points to a new player — they are poisoned. Then the previously poisoned player dies and becomes healthy."},
   shabaloth:{
     id:"shabaloth", name:"Shabaloth", team:"evil", type:"demon", fn:0, on:9,
     ab:"Each night*, choose 2 players: they die. A dead player you chose last night might be regurgitated.",
@@ -135,38 +135,39 @@ const BMR_C = {
 
 // BMR Night Orders (matches official night sheet)
 const BMR_FIRST_NIGHT = [
-  {id:"_minioninfo",      order:1,  title:"🤝 Minion Info"},
-  {id:"lunatic_info",     order:2,  title:"🌙 Lunatic (Info)"},
-  {id:"_demoninfo",       order:3,  title:"😈 Demon Info"},
-  {id:"sailor",           order:4,  title:"⛵ Sailor"},
-  {id:"courtier",         order:5,  title:"🍷 Courtier"},
-  {id:"godfather",        order:6,  title:"🎩 Godfather"},
-  {id:"devilsadvocate",   order:7,  title:"⚖️ Devil's Advocate"},
-  {id:"lunatic_action",   order:8,  title:"🌙 Lunatic (Action)"},
-  {id:"pukka",            order:9,  title:"🐍 Pukka"},
-  {id:"grandmother",      order:10, title:"👵 Grandmother"},
-  {id:"chambermaid",      order:11, title:"🛏️ Chambermaid"},
-  {id:"_goon",            order:12, title:"🔄 Goon (passive)"},
+  {id:"_minioninfo",      order:1,  title:"Minion Info"},
+  {id:"lunatic_info",     order:2,  title:"Lunatic (Info)"},
+  {id:"_demoninfo",       order:3,  title:"Demon Info"},
+  {id:"_lunatic_identity",order:4,  title:"Lunatic Identity"},
+  {id:"sailor",           order:5,  title:"Sailor"},
+  {id:"courtier",         order:6,  title:"Courtier"},
+  {id:"godfather",        order:7,  title:"Godfather"},
+  {id:"devilsadvocate",   order:8,  title:"Devil's Advocate"},
+  {id:"lunatic_action",   order:9,  title:"Lunatic (Action)"},
+  {id:"pukka",            order:10, title:"Pukka"},
+  {id:"grandmother",      order:11, title:"Grandmother"},
+  {id:"chambermaid",      order:12, title:"Chambermaid"},
+  {id:"_goon",            order:13, title:"Goon (passive)"},
 ];
 const BMR_OTHER_NIGHT = [
-  {id:"_minstrel",        order:1,  title:"🎵 Minstrel (cleanup)"},
-  {id:"sailor",           order:2,  title:"⛵ Sailor"},
-  {id:"innkeeper",        order:3,  title:"🍺 Innkeeper"},
-  {id:"courtier",         order:4,  title:"🍷 Courtier"},
-  {id:"gambler",          order:5,  title:"🎲 Gambler"},
-  {id:"devilsadvocate",   order:6,  title:"⚖️ Devil's Advocate"},
-  {id:"lunatic",          order:7,  title:"🌙 Lunatic"},
-  {id:"exorcist",         order:8,  title:"✝️ Exorcist"},
-  {id:"_demon",           order:9,  title:"👹 Demon"},
-  {id:"assassin",         order:10, title:"🗡️ Assassin"},
-  {id:"godfather",        order:11, title:"🎩 Godfather"},
-  {id:"professor",        order:12, title:"📚 Professor"},
-  {id:"gossip",           order:13, title:"💬 Gossip"},
-  {id:"tinker",           order:14, title:"🔧 Tinker"},
-  {id:"moonchild",        order:15, title:"🌙 Moonchild"},
-  {id:"_grandmother",     order:16, title:"👵 Grandmother (passive)"},
-  {id:"chambermaid",      order:17, title:"🛏️ Chambermaid"},
-  {id:"_goon",            order:18, title:"🔄 Goon (passive)"},
+  {id:"_minstrel",        order:1,  title:"Minstrel (cleanup)"},
+  {id:"sailor",           order:2,  title:"Sailor"},
+  {id:"courtier",         order:3,  title:"Courtier"},
+  {id:"innkeeper",        order:4,  title:"Innkeeper"},
+  {id:"gambler",          order:5,  title:"Gambler"},
+  {id:"devilsadvocate",   order:6,  title:"Devil's Advocate"},
+  {id:"lunatic",          order:7,  title:"Lunatic"},
+  {id:"exorcist",         order:8,  title:"Exorcist"},
+  {id:"_demon",           order:9,  title:"Demon"},
+  {id:"assassin",         order:10, title:"Assassin"},
+  {id:"godfather",        order:11, title:"Godfather"},
+  {id:"gossip",           order:12, title:"Gossip"},
+  {id:"professor",        order:13, title:"Professor"},
+  {id:"tinker",           order:14, title:"Tinker"},
+  {id:"moonchild",        order:15, title:"Moonchild"},
+  {id:"_grandmother",     order:16, title:"Grandmother (passive)"},
+  {id:"chambermaid",      order:17, title:"Chambermaid"},
+  {id:"_goon",            order:18, title:"Goon (passive)"},
 ];
 
 // Travellers for Bad Moon Rising
@@ -201,7 +202,6 @@ const BMR_TRAVELLERS = {
 const BMR = {
   id: "bmr",
   name: "Bad Moon Rising",
-  emoji: "🌙",
   color: "#f39c12",
   tagline: "More complex — experienced players",
   desc: "13 Townsfolk • 4 Outsiders • 4 Minions • 4 Demons",

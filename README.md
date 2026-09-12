@@ -1,461 +1,182 @@
 # Storyteller's Grimoire
 
-A mobile-friendly, browser-based companion for running **Trouble Brewing**, **Bad Moon Rising**, **Sects & Violets**, and a physical-card **Ultimate Werewolf** session.
+A mobile-first, browser-based companion for running Trouble Brewing, Bad Moon Rising, Sects & Violets, and physical-card Ultimate Werewolf sessions.
 
-The application helps a Storyteller or moderator record a roster, prepare or enter roles, follow a night order, track deaths, run a discussion timer, and keep a local chronicle. It is a facilitator, not a complete rules engine: unless a behavior is listed under [What the application automates](#what-the-application-automates), the Storyteller or moderator must apply the role text and resolve interactions.
+The app helps a Storyteller prepare a roster, assign characters, guide private reveals and night steps, track state changes, time discussions, record a chronicle, and transfer a live session to another device. It is a facilitator rather than a complete rules engine: the Storyteller remains responsible for applying the official rules and resolving interactions marked for manual handling.
 
 > This is an unofficial fan-made companion. Blood on the Clocktower, Ultimate Werewolf, character names, and associated artwork or trademarks belong to their respective owners. No affiliation or endorsement is claimed.
 
-## Table of contents
-
-- [Supported games](#supported-games)
-- [What the application automates](#what-the-application-automates)
-- [Using the website](#using-the-website)
-- [Blood on the Clocktower rules represented here](#blood-on-the-clocktower-rules-represented-here)
-- [Trouble Brewing roles](#trouble-brewing-roles)
-- [Bad Moon Rising roles](#bad-moon-rising-roles)
-- [Sects & Violets roles](#sects--violets-roles)
-- [Ultimate Werewolf rules and inventory](#ultimate-werewolf-rules-and-inventory)
-- [Ultimate Werewolf roles](#ultimate-werewolf-roles)
-- [Persistence and privacy](#persistence-and-privacy)
-- [Running locally](#running-locally)
-- [Deployment](#deployment)
-- [Architecture](#architecture)
-- [Artwork](#artwork)
-- [Browser support](#browser-support)
-- [Known limitations](#known-limitations)
-- [Contributing](#contributing)
-
 ## Supported games
 
-### Trouble Brewing
-
-The introductory Blood on the Clocktower script. The app contains 13 Townsfolk, 4 Outsiders, 4 Minions, the Imp, the standard 5–15-player distributions, first/other-night guidance, and five Traveller records.
-
-### Bad Moon Rising
-
-A Blood on the Clocktower script centered on death, survival, protection, and multiple possible night deaths. The app contains 13 Townsfolk, 4 Outsiders, 4 Minions, 4 Demons, standard 5–15-player distributions, first/other-night guidance, and five Traveller records.
-
-### Sects & Violets
-
-A Blood on the Clocktower script centered on information, character changes, poisoning, and madness-like role requirements. The app contains 13 Townsfolk, 4 Outsiders, 4 Minions, 4 Demons, standard 5–15-player distributions, first/other-night guidance, and five Traveller records.
-
-### Ultimate Werewolf
-
-A moderator-led physical-card mode for 5–75 recorded seats. The app does not create or randomize the deck. The moderator enters each dealt card in clockwise order, subject to the inventory quantities in the script data, and manually resolves role interactions and winners.
-
-## What the application automates
-
-### The app does
-
-- Select one of the four supported games.
-- Enforce each mode's configured player-count range.
-- Load and allow editing of the standard Blood on the Clocktower role-type distribution.
-- Randomly create an initial Blood on the Clocktower role pool and randomize its seat assignments.
-- Allow the Storyteller to customize the pool and manually change assignments.
-- Record Ultimate Werewolf physical cards by seat and enforce each card's inventory quantity.
-- Present Blood on the Clocktower roles in a private hand-off reveal flow.
-- For Trouble Brewing's Drunk, require an out-of-play assumed Townsfolk, reveal only that assumed role during hand-off, label Storyteller views as `Drunk (Assumed Role)`, and insert its fake wake at the assumed role's normal night position.
-- Maintain a Trouble Brewing Fortune Teller Red Herring when either a real Fortune Teller or a Drunk believing they are the Fortune Teller is present.
-- Show sober truth references for a Drunk believing they are an information role, while prominently instructing the Storyteller to give incorrect information.
-- Filter the configured first-night or other-night order to roles recorded in play.
-- Offer one-target night-action logging and add entries to a local chronicle.
-- Automatically mark a target for death only when a submitted target belongs to the Poisoner or one of the explicitly handled Demons: Imp, Fang Gu, Vigormortis, No-Dashi, or Vortox. Poisoner selection is logged but does not alter later information.
-- Apply queued night deaths when proceeding to day.
-- Let the operator manually mark a player dead or alive.
-- Offer a manual Blood on the Clocktower starpass control that moves the current Demon role to a selected living Minion.
-- Run a five-minute discussion timer, with pause, reset, and add-30-seconds controls, and attempt to sound a short Web Audio alarm at zero.
-- Let the operator manually declare good/evil victory in Blood on the Clocktower.
-- Let the moderator manually select one or more team and eligible individual winners in Ultimate Werewolf.
-- Save the current session in the browser and offer to resume it after reload.
-- After Trouble Brewing Night 1 ends, let the Storyteller give a host handoff QR that contains the live session JSON (players, roles, night steps, poison, chronicle, and related state). Handoff remains available during later days and in the middle of later nights.
-- Let a receiving device restore that session from the landing-page Storyteller Menu using the camera, a QR image, or pasted JSON.
-- Email a handoff QR after each Trouble Brewing day ends, using the same roster-email dispatch path.
-
-### The app does not
-
-- Validate that a selected role pool is a legal or balanced setup.
-- Apply setup modifiers such as Baron, Godfather, Fang Gu, or Vigormortis automatically.
-- Resolve poisoning, drunkenness, protection, registration, madness, nominations, executions, voting powers, resurrection, character changes, alignment changes, or most death prevention/causes.
-- Determine whether a target is legal for most roles, collect two-player/character choices, or calculate information outside the specific Trouble Brewing Drunk references described above.
-- Automatically determine victory conditions.
-- Replace the official rulebook, tokens, night sheets, or a knowledgeable Storyteller/moderator.
-
-Night prompts and role text are references. Pressing **Submit** records one selected living target; pressing **Next Step** advances even when no target is recorded. The operator remains responsible for all game consequences.
-
-## Using the website
-
-1. Open the site and select a game.
-2. Set the player count.
-   - Blood on the Clocktower shows an editable type distribution. Its total must match the player count before continuing.
-   - Ultimate Werewolf uses physical-card setup and does not show a generated distribution.
-3. Enter players clockwise. Blank names become `Player 1`, `Player 2`, and so on.
-4. Prepare roles.
-   - **Blood on the Clocktower:** review the generated role pool, customize it if needed, then assign or randomize all seats.
-   - **Trouble Brewing Drunk:** after manually assigning the Drunk to a seat, choose the out-of-play Townsfolk they believe they are. **Randomize All** makes this choice automatically. If Fortune Teller is real or assumed, also choose a good Red Herring. Required choices must be complete before finalization.
-   - **Ultimate Werewolf:** search for and record the card actually dealt to each seat. Cards at their inventory limit become unavailable.
-5. Finalize.
-   - **Blood on the Clocktower:** hand the device to each player in turn for their private role reveal, then begin Night 1.
-   - **Ultimate Werewolf:** the app opens directly on the guided night sequence; card reveal remains part of the physical game.
-6. During play, use:
-   - **Grimoire** for seats, roles, abilities, and manual alive/dead status.
-   - **Night Sequence** for the configured wake order and action log.
-   - **Town Square** for morning announcements and the discussion timer.
-   - **Chronicle** for recorded setup, targets, status changes, day transitions, and declared winners.
-7. Use the menu for the short rules reference, to reset the session, or to transfer a live Trouble Brewing game.
-   - **Give Handoff** appears after Night 1 ends. It shows a QR of the current session JSON so another device can take over, including mid-night.
-   - **Receive Handoff** is on the landing-page Storyteller Menu. Scan or upload the QR (or paste JSON) to replace this browser's saved session with the transferred game.
-8. After each day, when the Storyteller proceeds to the next night, a handoff QR is emailed as a backup when dispatch is configured.
-9. Resetting clears the saved game.
-
-Keep the device screen hidden whenever it displays the complete Grimoire, role assignments, night prompts, or chronicle.
-
-## Blood on the Clocktower rules represented here
-
-These are the general concepts explicitly presented by the current UI:
-
-- Good wins when the Demon dies and cannot pass demonhood to a Minion.
-- Evil wins when only two players remain alive and the Demon survives.
-- Day play supports public/private discussion and public nominations.
-- A dead player retains one vote token; the UI records whether that ghost vote has been used, although it does not provide a complete nomination/vote-resolution flow.
-- The Storyteller decides all role interactions and manually declares the winner.
-
-The three scripts use the same standard base distribution:
-
-| Players | Townsfolk | Outsiders | Minions | Demons |
-| ---: | ---: | ---: | ---: | ---: |
-| 5 | 3 | 0 | 1 | 1 |
-| 6 | 3 | 1 | 1 | 1 |
-| 7 | 5 | 0 | 1 | 1 |
-| 8 | 5 | 1 | 1 | 1 |
-| 9 | 5 | 2 | 1 | 1 |
-| 10 | 7 | 0 | 2 | 1 |
-| 11 | 7 | 1 | 2 | 1 |
-| 12 | 7 | 2 | 2 | 1 |
-| 13 | 9 | 0 | 3 | 1 |
-| 14 | 9 | 1 | 3 | 1 |
-| 15 | 9 | 2 | 3 | 1 |
-
-The distribution is editable in the UI. Setup abilities can require changes, but the app does not apply those changes for you.
-
-### Travellers
-
-Traveller definitions exist in each Blood on the Clocktower script file, but the active engine reads only the main `C` character map. Travellers therefore do **not** appear in role-pool generation, assignment, reveal, Grimoire, or night-order flows. They are documented below as data-only references.
-
-## Trouble Brewing roles
-
-### Townsfolk
-
-| Role | Ability |
-| --- | --- |
-| Washerwoman | You start knowing that 1 of 2 players is a particular Townsfolk. |
-| Librarian | You start knowing that 1 of 2 players is a particular Outsider, or that zero are in play. |
-| Investigator | You start knowing that 1 of 2 players is a particular Minion. |
-| Chef | You start knowing how many pairs of evil players there are. |
-| Empath | Each night, learn how many of your 2 alive neighbours are evil. |
-| Fortune Teller | Each night, choose 2 players and learn whether either is a Demon; one good Red Herring registers as a Demon. |
-| Undertaker | Each night except the first, learn which character died by execution that day. |
-| Monk | Each night except the first, choose another player; they are safe from the Demon that night. |
-| Ravenkeeper | If you die at night, choose a player and learn their character. |
-| Virgin | The first time you are nominated, if the nominator is a Townsfolk, they are executed immediately. |
-| Slayer | Once per game during the day, publicly choose a player; if they are the Demon, they die. |
-| Soldier | You are safe from the Demon. |
-| Mayor | If only 3 players live and no execution occurs, your team wins; if you die at night, another player might die instead. |
-
-### Outsiders
-
-| Role | Ability |
-| --- | --- |
-| Butler | Each night, choose another player; tomorrow you may vote only when they are voting too. |
-| Drunk | You do not know you are the Drunk; you think you are a Townsfolk, but you are not. |
-| Recluse | You might register as evil and as a Minion or Demon, even if dead. |
-| Saint | If you die by execution, your team loses. |
-
-### Minions
-
-| Role | Ability |
-| --- | --- |
-| Poisoner | Each night, choose a player; they are poisoned that night and the following day. |
-| Spy | Each night, see the Grimoire; you might register as good and as a Townsfolk or Outsider, even if dead. |
-| Scarlet Woman | If 5 or more players are alive when the Demon dies, you become the Demon. |
-| Baron | There are 2 extra Outsiders in play. |
-
-### Demon
-
-| Role | Ability |
-| --- | --- |
-| Imp | Each night except the first, choose a player; they die. If you kill yourself, a Minion becomes the Imp. |
-
-### Travellers (data-only)
-
-| Role | Ability |
-| --- | --- |
-| Scapegoat | If a player of your alignment is executed, you might be executed instead. |
-| Gunslinger | Each day after the first vote is tallied, you may choose a player who voted; they die. |
-| Beggar | You must use a vote token to vote. If a dead player gives you theirs, learn their alignment. You are sober and healthy. |
-| Bureaucrat | Each night, choose another player; their vote counts as 3 votes tomorrow. |
-| Thief | Each night, choose another player; their vote counts negatively tomorrow. |
-
-## Bad Moon Rising roles
-
-### Townsfolk
-
-| Role | Ability |
-| --- | --- |
-| Grandmother | Start knowing a good player and their character; if the Demon kills them, you die too. |
-| Sailor | Each night, choose an alive player; either you or they are drunk until dusk. You cannot die. |
-| Chambermaid | Each night, choose 2 alive players other than yourself; learn how many woke due to their ability that night. |
-| Exorcist | Each night except the first, choose a player different from last night; if they are the Demon, they do not wake that night. |
-| Innkeeper | Each night except the first, choose 2 players; they cannot die that night, but 1 is drunk until dusk. |
-| Gambler | Each night except the first, choose a player and guess their character; if wrong, you die. |
-| Gossip | Each day, you may make a public statement; that night, if it was true, a player dies. |
-| Courtier | Once per game at night, choose a character; they are drunk for 3 nights and 3 days. |
-| Professor | Once per game at night except the first, choose a dead player; if they are a Townsfolk, they are resurrected. |
-| Minstrel | When a Minion dies by execution, all other players except Travellers are drunk until dusk tomorrow. |
-| Tea Lady | If both your alive neighbours are good, they cannot die. |
-| Pacifist | Executed good players might not die. |
-| Fool | The first time you die, you do not. |
-
-### Outsiders
-
-| Role | Ability |
-| --- | --- |
-| Tinker | You might die at any time. |
-| Moonchild | When you learn that you died, publicly choose an alive player; that night, if they are good, they die. |
-| Goon | Each night, the first player to choose you with their ability is drunk until dusk; you become their alignment. |
-| Lunatic | You think you are a Demon, but are not; the Demon knows who you are and whom you choose at night. |
-
-### Minions
-
-| Role | Ability |
-| --- | --- |
-| Godfather | Start knowing which Outsiders are in play. If one died today, choose a player that night; they die. The setup has 1 fewer or 1 extra Outsider. |
-| Devil's Advocate | Each night, choose a living player different from last night; if executed tomorrow, they do not die. |
-| Assassin | Once per game at night except the first, choose a player; they die even if they otherwise could not. |
-| Mastermind | If the Demon dies by execution, play for 1 more day; if a player is then executed, their team loses. |
-
-### Demons
-
-| Role | Ability |
-| --- | --- |
-| Zombuul | Each night except the first, if nobody died today, choose a player; they die. The first time you die, you live but register as dead. |
-| Pukka | Each night, choose a player; they are poisoned. The previously poisoned player dies, then becomes healthy. |
-| Shabaloth | Each night except the first, choose 2 players; they die. A dead player chosen last night might be regurgitated. |
-| Po | Each night except the first, you may choose a player; they die. If your last choice was nobody, choose 3 players tonight. |
-
-### Travellers (data-only)
-
-| Role | Ability |
-| --- | --- |
-| Apprentice | On your first night, gain a Townsfolk ability if good or a Minion ability if evil. |
-| Matron | Players may not leave their seats for private talks. Each day, choose up to 3 pairs of players to swap seats. |
-| Voudon | Only you and dead players can vote; dead players need no vote token, and a 50% majority is not required. |
-| Judge | Once per game, if another player nominated, force the current execution to pass or fail. |
-| Bishop | Only the Storyteller can nominate; at least 1 opposing player must be nominated each day. |
-
-## Sects & Violets roles
-
-### Townsfolk
-
-| Role | Ability |
-| --- | --- |
-| Clockmaker | Start knowing how many steps from the Demon the closest Minion is. |
-| Dreamer | Each night, choose a player other than yourself or the Demon; learn 1 good and 1 evil character, one of which is their true character. |
-| Snake Charmer | Each night, choose an alive player; a chosen Demon swaps characters and alignments with you, then you become poisoned. |
-| Mathematician | Each night, learn how many players' abilities worked abnormally due to poison or drunkenness since dusk. |
-| Flowergirl | Each night except the first, learn whether the Demon voted today. |
-| Town Crier | Each night except the first, learn whether a Minion nominated today. |
-| Oracle | Each night except the first, learn how many dead players are evil. |
-| Savant | Each day, visit the Storyteller to learn 2 pieces of information: 1 true and 1 false. |
-| Artist | Once per game during the day, privately ask the Storyteller a question answerable with yes, no, or do not know. |
-| Juggler | On your first day, publicly guess up to 5 players' characters; that night, learn how many were correct. |
-| Sage | If the Demon kills you at night, wake and choose 2 players; 1 is the Demon. |
-| Philosopher | Once per game at night, choose a good character and gain their ability; if in play, that player is drunk. |
-| Pixie | Start knowing 1 in-play Townsfolk character. If you madly play as them and they are not in play or are dead, you might gain their ability. |
-
-### Outsiders
-
-| Role | Ability |
-| --- | --- |
-| Mutant | You must play as if you are a Townsfolk or Outsider, as applicable; if the Storyteller thinks you break this rule, you might be executed. |
-| Sweetheart | When you die, 1 player is drunk from then on. |
-| Barber | If you die, the Demon may choose 2 other players to swap characters. |
-| Klutz | If you die by execution, choose a player; if they are not good, your team loses. |
-
-### Minions
-
-| Role | Ability |
-| --- | --- |
-| Evil Twin | You and an opposing player know each other. While you live, good cannot win; if you die, good wins if the Demon is dead. |
-| Witch | Each night, choose a player; if they nominate tomorrow, they die. |
-| Cerenovus | Each night, choose a player and character; tomorrow they must madly play as that character or might be executed. |
-| Pit-Hag | Each night except the first, choose a player and character; they become that character. If the Demon changes, deaths that night might be altered. |
-
-### Demons
-
-| Role | Ability |
-| --- | --- |
-| Fang Gu | Each night except the first, choose a player; they die. The first Outsider chosen becomes an evil Fang Gu and you die instead. Setup has 1 extra Outsider. |
-| Vigormortis | Each night except the first, choose a player; they die. Minions you kill keep their abilities but register as dead. Setup has 1 fewer Outsider. |
-| No-Dashi | Each night except the first, choose a player; they die. Your 2 closest alive Townsfolk neighbours are poisoned. |
-| Vortox | Each night except the first, choose a player; they die. Townsfolk information is false, and Townsfolk must nominate each day or evil wins. |
-
-### Travellers (data-only)
-
-| Role | Ability |
-| --- | --- |
-| Barista | Each night, choose a player; they are sober, healthy, and receive true information, or their ability activates twice that night. |
-| Harlot | Each night except the first, choose a player; if they agree, you learn each other's alignment, but 1 of you might die. |
-| Butcher | Each day, you may start a double execution. |
-| Bone Collector | Once per game at night, choose a dead player; they regain their ability that night and tomorrow. |
-| Deviant | If you are executed, you might not die. |
-
-## Ultimate Werewolf rules and inventory
-
-The repository defines this as a physical-card, moderator-run mode:
-
-- Record 5–75 players clockwise.
-- Build and deal the physical deck outside the app. The app does not suggest a composition, shuffle, deal, or infer team counts.
-- Do not record more copies of a card than the inventory permits.
-- Discussion is public only.
-- Dead players cannot vote.
-- At night, dead players may keep their eyes open and silently watch, but they do not act, wake for their role, or become valid targets.
-- The moderator applies every role interaction and decides all deaths, conversions, protections, information, and other consequences.
-- The moderator may declare any combination of Village, Werewolves, Vampires, and Cult winners, plus eligible in-play solo/conditional role winners.
-
-Every role has 1 card unless listed here:
-
-| Card | Quantity |
-| --- | ---: |
-| Villager | 20 |
-| Werewolf | 12 |
-| Vampire | 8 |
-| Mason | 3 |
-| Every other listed role | 1 each |
-
-The inventory contains 97 cards in total, while the configured session maximum is 75 players.
-
-Some definitions include a separate reference variation. The tables show the primary ability first and preserve each variation where the data supplies one.
-
-## Ultimate Werewolf roles
-
-### Village
-
-| Role | Ability |
-| --- | --- |
-| Apprentice Seer | Become the Seer if the Seer is killed. |
-| Aura Seer | At night, find the team of one player. **Variation:** learn whether someone has a non-ordinary role and what it is. |
-| Beholder | Open your eyes on the first night to see who the Seer is. |
-| Bodyguard | Choose a different player each night to protect; that player cannot be killed that night. |
-| Cupid | Choose two lovers; if one dies, the other dies from a broken heart. |
-| The Count | On the first night, learn how many werewolves are in each half of the village. |
-| Diseased | If attacked by werewolves, the werewolves do not get fed the following night. |
-| Ghost | Die on the first night, then each day write one-letter clues as a message from beyond, with no names or initials. |
-| Hunter | If killed, take someone down with you. |
-| Village Idiot | Always vote for players to die. |
-| Insomniac | Each night, learn whether at least one neighbour woke during the night. |
-| Lycan | You are a villager but appear to Seers and the P.I. as a werewolf. |
-| Martyr | Take the place of someone killed before their role is revealed. |
-| Mason | Know the other Masons. Inventory: 3. |
-| Mayor | If you reveal yourself, your elimination vote counts twice. |
-| Old Hag | At night, choose a player who must leave the village the next day. |
-| Old Man | Die on night X, where X is the number of werewolves plus one. |
-| P.I. | Inspect three adjacent players each night; learn only whether at least one is malicious. **Variation:** inspect on one night. |
-| Pacifist | You cannot vote when eliminating a player. |
-| Priest | On the first night, protect a player; the next attempt to kill them fails, then on the following night protect someone different. **Variation:** protect one player from a night-caused death, including vampire attacks. |
-| Prince | You cannot be killed during the day. |
-| Seer | Each night, choose a player and learn whether they are on the villager team, a vampire, or—if a werewolf—their exact powers. |
-| Spellcaster | At night, choose a player who must not use their voice the following day. |
-| Tough Guy | Survive an extra day if attacked by werewolves at night. |
-| Troublemaker | Once per game, choose to have two elimination attempts in one day; a tied vote wastes the chance. |
-| Thing | Each night, tap a player sitting immediately next to you. |
-| Villager | Find and eliminate the werewolves during the day. Inventory: 20. |
-| Witch | Once each per game, kill or save a player. |
-| Cursed | You are a villager until attacked by werewolves, then become a werewolf. **Variation:** become a vampire when attacked by vampires. |
-| Drunk | You are a villager until the third night, when you remember your real role. |
-| Little Girl | You may discreetly peek each night; you die if the wolves correctly signal that you are the Little Girl. |
-| Wild Child | On the first night, choose a role model; if they die, become a werewolf. Until then, you are a normal villager. |
-| Sasquatch | You are a villager until a day ends without an elimination, then become a werewolf. |
-| Leprechaun | You may redirect a werewolf attack to a player adjacent to its target. |
-| Fortune Teller (Miller's Hollow) | Learn an inspectee's exact role except for Wolf Man and Lycan; the inspected player is not told. |
-
-### Werewolf team
-
-| Role | Ability |
-| --- | --- |
-| Big Bad Wolf | If the pack's target is beside you, you may kill any combination of your adjacent players; if the Leprechaun redirects the initial attack, none of them die. **Variation:** attack one person beside the initial target. |
-| Fruit Brute | If you are the last wolf alive, you cannot feed, but still try to root out all villagers. |
-| Wolf man | The opposite of a Lycan: you are a werewolf but Seers and the P.I. see you as a villager. |
-| White Wolf (Miller's Hollow) | Wake nightly with the werewolves and every other night alone to kill anyone; win only as the lone survivor. |
-| Sorcerer | You are a Seer on the Werewolf team; learn only whether you found a werewolf, another Seer, or something else. |
-| Minion | Work with the werewolves or vampires to kill villagers; the moderator decides which team you support. |
-| Werewolf | Eat a villager each night. Inventory: 12. |
-| Wolf Cub | If you die, the werewolves receive two kills the following night. |
-| Dream Wolf | Replace a dead werewolf; do not wake until a werewolf dies. |
-| Lone Wolf | You are a werewolf but win only if you are the last wolf-team member alive. |
-| Dire Wolf | On the first night, choose a companion; you die if they die, but they do not die if you do. **Variation:** put yourself in love on the first night. |
-| Black Wolf | Combines Spellcaster and Werewolf abilities. |
-
-### Vampire team
-
-| Role | Ability |
-| --- | --- |
-| Vampire | Attack another player each night; they die if there is a nomination the next day. Inventory: 8. |
-
-### Cult
-
-| Role | Ability |
-| --- | --- |
-| Cult Leader | Each night, add a player to your cult; win if every living player is in it. |
-
-### Solo and conditional winners
-
-| Role | Ability |
-| --- | --- |
-| Bogeyman | If the wolves cannot decide whom to kill, decide for them; win if all night-active players are dead. |
-| Doppelgänger | Choose a player on the first night; if they die, secretly take their role. |
-| Hoodlum | Choose two players on the first night; win if both die and you are alive at game end. |
-| Tanner | Win only if you are killed. |
-| Bloody Mary | If you die, each night kill someone from the team that killed you. |
-| Chupacabra | Each night, choose a player; if they are a werewolf, they die. If all wolves are dead, kill a player each night. |
-| Nostradamus | Predict the winning team on the first night; if it wins and you survive, gain a solo win, acting as a villager otherwise. |
-
-White Wolf and Lone Wolf are grouped with the Werewolf team above but are also available as individual winners in the app. The app's individual-winner picker includes Bogeyman, White Wolf, Doppelgänger, Hoodlum, Tanner, Lone Wolf, Bloody Mary, Chupacabra, and Nostradamus.
-
-### Artifact
-
-| Role | Ability |
-| --- | --- |
-| The Amulet of Protection | Its holder does not die; pass it to another player each day or it is destroyed. |
-
-### Moderator
-
-| Role | Ability |
-| --- | --- |
-| Moderator | Moderates the game; the role data says the game cannot be played without this role. |
+| Game | Setup | Player range | Discussion timers |
+| --- | --- | ---: | --- |
+| Trouble Brewing | Standard character distribution | 5–15 | Public and private |
+| Bad Moon Rising | Standard character distribution | 5–15 | Public and private |
+| Sects & Violets | Standard character distribution | 5–15 | Public and private |
+| Ultimate Werewolf | Physical-card inventory | 5–75 | Not present |
+
+The three Blood on the Clocktower scripts include their complete base character rosters, Traveller reference data, and first-night and other-night orders. Sects & Violets uses Seamstress in its official 13-Townsfolk roster. Trouble Brewing applies the Baron's setup adjustment; Bad Moon Rising prompts for the Godfather's legal choice of one fewer or one additional Outsider; Sects & Violets applies the Fang Gu and Vigormortis setup adjustments.
+
+Ultimate Werewolf records the physical cards dealt around the table and respects the configured inventory quantity for each card. Its role interactions and winner conditions remain under moderator control.
+
+## What the app handles
+
+- Script selection and player-count limits.
+- Nonblank, unique player names entered in seating order.
+- Standard Blood on the Clocktower distributions, editable character pools, random assignment, and manual assignment.
+- Strict setup checks before a Blood on the Clocktower game begins, including seat coverage, unique character limits, pool consistency, and effective type counts.
+- Trouble Brewing Drunk setup, including the believed Townsfolk and Fortune Teller Red Herring.
+- Covered, one-player-at-a-time private role reveals.
+- Script-aware first-night and other-night sequences, including relevant reminder steps, dead-character filtering, reactive wake steps, and once-per-game tracking.
+- Role-aware target counts and character choices for supported night prompts.
+- Direct state effects for the small set explicitly implemented in the engine, with clear manual-resolution messaging for other character interactions.
+- Alive/dead state, a single recorded execution per day, vote-token state, ghost votes, and the Trouble Brewing Imp starpass.
+- A local chronicle of setup, night actions, phase changes, executions, status changes, and the declared result.
+- Confirmed game conclusion and winner recording.
+- Contextual Back controls and persistent Undo history for meaningful state changes.
+- Live-session handoff by link, QR, or JSON.
+- Three optional email events: Game Start, Night Complete, and Game End.
+
+The app does not replace the official rulebook, tokens, night sheets, or a knowledgeable Storyteller. It does not provide a full nomination and vote-counting system, and it does not resolve every poisoning, drunkenness, protection, registration, madness, resurrection, character-change, alignment-change, or victory interaction.
+
+## Running a game
+
+1. Open the app and choose a game.
+2. Choose the player count.
+3. Enter every player clockwise. Names must be filled in and unique.
+4. Prepare the characters.
+   - For a Blood on the Clocktower script, review the generated pool, adjust it if needed, and assign each seat.
+   - For Ultimate Werewolf, record the physical card dealt to each seat. Cards at their inventory limit cannot be selected again.
+5. Resolve any script-specific setup fields shown by the app, then finalize the setup.
+6. For Blood on the Clocktower, pass the device to each player for the covered private reveal. The Storyteller then unlocks the next reveal.
+7. During play, use:
+   - **Grimoire** for seats, characters, abilities, status, executions, and vote state.
+   - **Night Sequence** for the current wake step and action record.
+   - **Town Square** for announcements, timer setup, and the next-night transition.
+   - **Chronicle** for the session record.
+8. Use the Storyteller menu for Undo, handoff, the rules reference, pending email delivery, or a confirmed reset.
+
+Controls that modify consequential state create a labeled history entry. Undo restores the saved snapshot, stops any running timer, and tells the Storyteller what was reverted. Back controls move between setup screens without silently erasing the active session.
+
+## Discussion timers
+
+Discussion timers exist only in Trouble Brewing, Bad Moon Rising, and Sects & Violets. Ultimate Werewolf has no timer controls or timer-selection UI.
+
+Each Blood on the Clocktower day has independent **Public** and **Private** timer settings:
+
+- Each type can be enabled or left off for that day.
+- Each type has its own duration and remaining time.
+- Durations range from 30 seconds to 60 minutes in 30-second steps.
+- Changing a duration also makes that value the starting default for the same discussion type on the next day.
+- The next day starts with the full carried duration, not the previous day's remaining time.
+- Starting, pausing, adding 30 seconds, resetting, and switching discussion type preserve stable clock rendering.
+- A restored save, handoff, or Undo result never resumes a timer in a running state.
+
+## Undo and recovery
+
+The history module keeps up to 30 labeled snapshots in browser storage. It covers night actions and step changes, phase transitions, timer settings and adjustments, executions, alive/dead changes, vote changes, starpasses, and game conclusion.
+
+Undo is available from the Storyteller menu when a recoverable snapshot exists. Beginning a new game or accepting a handoff clears the previous history so an old session cannot be restored into the new one.
+
+## Host handoff
+
+Handoff is available for all four supported games once setup has reached private reveal or active play. It is designed for a single current host:
+
+1. The current host opens **Give Handoff**.
+2. The app creates a takeover link, one or more QR codes, and downloadable/copyable JSON.
+3. The receiving host opens the link, scans every QR part, uploads a QR/JSON file, or pastes the link or JSON.
+4. The receiving device validates the payload and asks before replacing an existing session.
+5. The restored timer is paused, transient dialogs are cleared, and the receiving host continues from the captured phase and wake step.
+
+Version 2 handoffs use a bounded, validated schema for roster, assignments, phase, night log, chronicle, timer state, and other durable session fields. Older Trouble Brewing version 1 handoffs remain readable. Large payloads may be split across several numbered QR codes.
+
+Handoff links store the encoded session in the URL fragment. The fragment is removed from the receiving address bar before import and is not part of the page request. Encoding and compression are not encryption: a link, QR, or JSON file contains private player names, character assignments, and Storyteller records. Share it only with the next trusted host and delete exported files when they are no longer needed.
+
+Handoff is a snapshot transfer, not live synchronization. After takeover, use only the intended host device.
+
+## Email events
+
+The email module supports exactly these event types:
+
+1. **Game Start** — created after setup is finalized; includes session details and the roster.
+2. **Night Complete** — created after each completed night; includes the recorded night results.
+3. **Game End** — created after the winner is confirmed; includes the result and final roster.
+
+Each event has a responsive dark HTML document and a plain-text fallback. Game Start and Night Complete messages can include a takeover link, handoff JSON, and an inline QR attachment so a trusted recipient can continue the session.
+
+### Delivery is opt-in
+
+Remote delivery is off by default. [`scripts/runtime-config.js`](scripts/runtime-config.js) contains an empty `emailEndpoint`, so the static app has no browser-held mail credential and does not generate or send email. After an operator deliberately configures an HTTPS relay, a failed delivery is retained in the local pending outbox for retry.
+
+Copy the shape from [`scripts/runtime-config.example.js`](scripts/runtime-config.example.js) and set only a public HTTPS endpoint URL:
+
+```js
+window.GRIMOIRE_RUNTIME_CONFIG = {
+  emailEndpoint: "https://mail-relay.example/grimoire-email"
+};
+```
+
+Never place an SMTP password, repository credential, or private service key in a file delivered by GitHub Pages.
+
+The browser sends this JSON envelope to the configured endpoint:
+
+```json
+{
+  "eventType": "game-start | night-complete | game-end",
+  "subject": "Rendered subject",
+  "html": "Self-contained HTML document",
+  "text": "Plain-text fallback",
+  "idempotencyKey": "Stable event identifier",
+  "handoverUrls": ["Optional ordered takeover URL parts"]
+}
+```
+
+A production relay must:
+
+- accept HTTPS only;
+- allow the deployed site origin through CORS;
+- authenticate or otherwise authorize requests without exposing a private credential to the browser;
+- reject every event type except the three listed above;
+- enforce request-size and rate limits;
+- validate and sanitize all supplied content;
+- deduplicate accepted requests by `idempotencyKey`;
+- return a successful status only after the message is durably accepted; and
+- keep every delivery credential outside the browser.
+
+The included [`send-game-email.yml`](.github/workflows/send-game-email.yml) job accepts a `repository_dispatch` event named `send-game-email`, checks the three event types, sanitizes the HTML, creates the handoff QR attachment, and sends through Gmail SMTP. A private relay may wrap the browser envelope as `client_payload` for that event. Configure these repository secrets for the job:
+
+- `SMTP_EMAIL`
+- `SMTP_APP_PASSWORD`
+- `EMAIL_TO`
+
+The workflow's concurrency group only serializes matching requests; it is not durable duplicate suppression. The relay must reject an `idempotencyKey` it has already accepted.
+
+`EMAIL_TO` must identify trusted Storyteller recipients. Game Start, Night Complete, and handoff content can disclose every character assignment and private action. Do not send these messages to a general player list.
+
+The GitHub Pages site remains usable without a relay; only remote email delivery is unavailable.
 
 ## Persistence and privacy
 
-- Session state is serialized as JSON in the current browser's `localStorage` under `botc_storyteller_v2`.
-- Saved data includes player names, script, distribution, assignments, alive/dead status, night targets, chronicle entries, timer values, declared winners, and the current Trouble Brewing Poisoner target.
-- Trouble Brewing saves also include each Drunk seat's believed Townsfolk and the Fortune Teller Red Herring. Older saves without these fields load with safe empty defaults; an active legacy Drunk game returns to role setup so the Storyteller can make the required secret choice.
-- Reloading the main page offers to resume a saved session.
-- The timer is paused after a resumed reload for safety.
-- **Reset Session** and **Reset & New Game** remove the saved session.
-- Trouble Brewing host handoff copies that same JSON onto a QR code so another device can load it. After each day ends, the app can also email that QR through the existing GitHub Actions mail dispatch.
-- There is no application server, account system, or analytics code. Roster and handoff emails use a configured GitHub repository_dispatch token when present.
-- Data therefore stays in that browser storage unless the host transfers it by QR/JSON, email dispatch is configured, or the hosting environment, browser extensions, developer tools, device backups, or browser synchronization expose or copy it.
-- Anyone using the same browser profile can potentially inspect the stored JSON. Do not enter sensitive personal information, and clear the session on shared devices.
+The app uses browser storage on the current origin:
+
+| Key | Storage | Contents | Retention |
+| --- | --- | --- | --- |
+| `botc_storyteller_v2` | `localStorage` | Current durable game state | Until reset, replacement by another session, or site data is cleared |
+| `botc_storyteller_history_v1` | `localStorage` | Up to 30 Undo snapshots | Cleared for a new game or accepted handoff |
+| `botc_storyteller_email_outbox_v1` | `localStorage` | Up to 20 pending rendered email envelopes | Removed after delivery, session reset, or an accepted takeover |
+| `botc_handoff_parts_v2` | `sessionStorage` | Incomplete multipart QR collection | Cleared after completion/cancel or when the tab session ends |
+
+The current state, history, pending mail, and handoff data can include player names, secret characters, alignments, targets, deaths, notes, and winner information. Browser storage is not encrypted. Anyone with access to the same browser profile, browser extensions, developer tools, backups, or synchronization data may be able to inspect it.
+
+Reset clears the active save, Undo history, and pending email outbox. On a shared device, also clear the site's browser data and delete downloaded handoff files after use.
+
+When remote delivery is enabled, the generated email envelope and handoff link leave the device and are handled by the configured relay, GitHub Actions when the included job is used, the mail provider, and the recipient mailbox. Review their privacy and retention policies, restrict repository and mailbox access, and choose an appropriate workflow-log retention period before enabling delivery.
 
 ## Running locally
 
-No build step or package installation is required.
+No build step or package installation is required for the site.
 
-### Directly
-
-Open [`index.html`](index.html) in a modern browser. The app uses only relative static assets and does not fetch data.
-
-Some browser security policies behave more consistently over HTTP. If direct `file://` loading causes storage, audio, or asset issues, serve the repository locally, for example:
+Open [`index.html`](index.html) directly, or serve the repository over HTTP for browser features that require a normal origin:
 
 ```powershell
 py -m http.server 8000
@@ -463,147 +184,121 @@ py -m http.server 8000
 
 Then visit `http://localhost:8000/`.
 
-[`trouble_brewing.html`](trouble_brewing.html) and [`bad_moon_rising.html`](bad_moon_rising.html) are convenience redirects that preselect their respective scripts before loading the main page.
+The convenience entry pages preselect a script without changing an existing saved session:
 
-## Deployment
+- [`trouble_brewing.html`](trouble_brewing.html)
+- [`bad_moon_rising.html`](bad_moon_rising.html)
+- [`sects_and_violets.html`](sects_and_violets.html)
 
-Deploy the repository root to any static-file host:
+## GitHub Pages deployment
 
-1. Preserve the directory structure.
-2. Make [`index.html`](index.html) the entry document.
-3. Publish `scripts/`, `styles/`, `assets/`, and the optional script-specific redirect pages together.
-4. Use HTTPS when possible so browser storage and audio run in a normal secure context.
+[`pages.yml`](.github/workflows/pages.yml) runs the test suite, checks every JavaScript file, and assembles a minimal static artifact. The artifact contains only:
 
-There are no server routes, environment variables, secrets, package dependencies, or build artifacts to configure. Persistence remains browser-local; deploying a new version does not migrate or centrally back up sessions.
+- `index.html` and the three Blood on the Clocktower convenience entry pages;
+- the runtime JavaScript files under `scripts/`;
+- `styles/main.css`; and
+- the required PNG character artwork under `assets/images/`.
+
+Tests, documentation, handoff fixtures, the legacy reference page, workflow files, and the runtime configuration example are not published.
+
+The deployment runs on pushes to `main` and can also be started from the Actions page. The app uses relative paths, so it remains compatible with a repository subpath on GitHub Pages.
 
 ## Architecture
 
-The project is a small global-script single-page application:
+The project is a framework-free, global-script single-page app.
 
 ```text
-.
-├── index.html                      # Loads data, engine, and starts rendering
-├── trouble_brewing.html            # Trouble Brewing preselection redirect
-├── bad_moon_rising.html            # Bad Moon Rising preselection redirect
-├── scripts/
-│   ├── trouble_brewing.js          # TB roles, distribution, travellers, night order
-│   ├── bad_moon_rising.js          # BMR roles, distribution, travellers, night order
-│   ├── sects_and_violets.js        # S&V roles, distribution, travellers, night order
-│   ├── ultimate_werewolf.js        # UW roles, inventory, mode rules, night order
-│   ├── handoff-qr.js               # Byte-mode QR encoder for host handoff
-│   ├── common.js                   # State, persistence, event handlers, and rendering
-│   └── handoff.js                  # Give/receive host handoff and day-end QR email
-├── styles/
-│   └── main.css                    # Responsive visual design
-└── assets/
-    └── images/
-        └── README.md               # Artwork naming and directory guidance
+index.html
+scripts/
+  runtime-config.js       Optional public endpoint URL; never credentials
+  icons.js                Reusable inline SVG icon renderer
+  history.js              Bounded snapshots and timer-safe Undo restoration
+  game-rules.js           Setup checks, wake-list expansion, and action specs
+  email.js                Payload normalization and three email templates
+  trouble_brewing.js      Trouble Brewing data
+  bad_moon_rising.js      Bad Moon Rising data
+  sects_and_violets.js    Sects & Violets data
+  ultimate_werewolf.js    Ultimate Werewolf data and inventory
+  handoff-qr.js           Local QR encoder
+  common.js               State, persistence, workflow handlers, and rendering
+  handoff.js              Handoff schema, encoding, transfer UI, and restore
+styles/
+  main.css                Dark responsive visual system
+tests/
+  discussion-timers.test.js
+  email-system.test.js
+  game-rules.test.js
+  handoff.test.js
+  history.test.js
+  script-data.test.js
+  static-entry.test.js
+  workflow-state.test.js
 ```
 
-### Data model
+Load order in [`index.html`](index.html) is intentional: configuration and shared modules load first, game data follows, then QR support, the main engine, and the browser handoff adapter.
 
-Each game exposes a global object consumed by `common.js`:
+### State and rendering
 
-- `C`: active character records keyed by role ID.
-- `DIST`: player-count distributions; empty for Ultimate Werewolf.
-- `FIRST_NIGHT` and `OTHER_NIGHT`: ordered wake/reference nodes.
-- Script metadata such as ID, name, color, and setup behavior.
-- Blood on the Clocktower scripts additionally define `TRAVELLERS`, currently unused by the engine.
-- Ultimate Werewolf additionally defines physical-card mode, player limits, discussion/death rules, winner groups, and individual-winner role IDs.
+`scripts/common.js` owns the live `state` object and renders the current screen into `#app`. Durable save and handoff fields are selected by `getSerializableState()`. The history module separately removes short-lived values such as dialogs, intervals, camera streams, and open drawers from Undo snapshots.
 
-Each character supplies an ID, display name, category/type, team, ability text, and optional first/other-night instructions. Ultimate Werewolf also supplies inventory quantity and optional variation text.
+`scripts/game-rules.js`, `scripts/history.js`, `scripts/email.js`, and the codec portion of `scripts/handoff.js` expose browser globals and CommonJS exports. This keeps browser loading simple while allowing focused Node tests without a browser framework.
 
-### Rendering and state
+### Visual system
 
-`scripts/common.js` owns a single mutable `state` object and renders HTML strings into `#app`. Inline event handlers call global functions, mutate state, save relevant changes, and render again. The main screens are script selection, count, roster, role setup, private reveal, active game, host-handoff receive, and victory. Active-game tabs render the Grimoire, night sequence, day brief/timer, and chronicle.
+The interface uses a dark, restrained design with touch-sized controls, narrow-screen layouts, safe-area padding, reduced-motion support, forced-color support, and tabular timer numerals. [`scripts/icons.js`](scripts/icons.js) supplies the shared SVG icon language. Missing character artwork falls back to the matching vector category mark.
 
-Load order matters: all four game-data scripts must execute before `common.js`. `handoff-qr.js` may load before `common.js`; `handoff.js` must load after it.
-
-## Artwork
-
-Role images are expected at:
+Character artwork is read from:
 
 ```text
-assets/images/<category>/<role-id>.png
+assets/images/<category>/<character-id>.png
 ```
 
-The engine maps Townsfolk/Village to `townsfolk`, Outsiders/Solo to `outsiders`, Minions/Cult to `minions`, Demons/Werewolves/Vampires to `demons`, and Travellers/Artifacts/Moderator to `travellers`. If an image fails to load, the UI replaces it with a category emoji.
-
-The current repository contains the artwork guidance file but no role PNGs in the expected category directories, so emoji fallbacks are the effective default. See [`assets/images/README.md`](assets/images/README.md) for naming guidance. Contributors are responsible for ensuring that any added artwork may legally be redistributed.
+See [`assets/images/README.md`](assets/images/README.md) for naming and licensing guidance.
 
 ## Browser support
 
-There is no automated compatibility matrix. The source requires a modern browser with:
+A current Chromium, Firefox, or Safari-family browser is recommended. Core requirements are JavaScript, DOM APIs, CSS custom properties, Grid/Flexbox, `localStorage`, and `sessionStorage`.
 
-- JavaScript enabled.
-- `const`, `let`, template literals, object spread, optional chaining, and nullish coalescing.
-- `Object.fromEntries`, `Object.entries`, `Set`, and standard array methods.
-- DOM APIs and inline event-handler support.
-- `localStorage` for save/resume behavior.
-- `BarcodeDetector` for camera and image QR scanning (Chromium and recent Safari). JSON paste/upload remains available when that API is missing.
-- `getUserMedia` for the receive-handoff camera, which requires a secure context (HTTPS or localhost).
-- `CompressionStream` / `DecompressionStream` to pack large handoff payloads; uncompressed JSON is used when those APIs are missing.
-- Web Audio (`AudioContext` or `webkitAudioContext`) for the timer alarm.
-- CSS custom properties, Grid/Flexbox, animations, and `backdrop-filter` for the intended presentation.
+Some features depend on newer browser APIs:
 
-Current Chromium, Firefox, and Safari-family browsers are reasonable targets based on those APIs, but the repository contains no browser test suite. If storage is unavailable, the app continues without reliable persistence. If Web Audio is unavailable or blocked until user interaction, the timer still runs but the alarm may be silent.
+- `BarcodeDetector` for camera and uploaded-image QR decoding. Link/JSON paste and JSON upload remain available without it.
+- `getUserMedia` for live camera scanning; this requires HTTPS or localhost.
+- `CompressionStream` and `DecompressionStream` for compact handoffs. Plain encoded JSON is used when compression is unavailable, but a browser without decompression support cannot open a compressed transfer.
+- Web Audio for the timer alarm. The timer still runs if audio is unavailable or blocked.
+- Clipboard access for one-tap copy. Download remains available if clipboard permission is denied.
+
+## Tests
+
+The test suite uses Node's built-in test runner and requires no project dependencies:
+
+```powershell
+node --test tests/*.test.js
+```
+
+It covers timer isolation and persistence, all three Blood on the Clocktower datasets, setup validation, wake expansion, role-aware action specs, Undo restoration, email safety and content, handoff schema/round trips/multipart transfer, static entry points, responsive CSS expectations, workflow event scope, and key game-state regressions.
+
+Browser-facing paths are exercised through Node VM harnesses and static integration checks rather than a full browser-runner suite, so release verification still includes real browser testing.
+
+For release checks, also complete a mobile portrait pass through setup, reveal, first night, day timers, later-night flow, Undo, winner confirmation, and handoff for each Blood on the Clocktower script. Test Ultimate Werewolf separately and confirm that no timer control appears.
 
 ## Known limitations
 
-- The app is a reference and tracker, not a rules adjudicator.
-- Role prompts can be incomplete for abilities requiring multiple players, character choices, arbitrary information, secret state, or daytime actions.
-- A Trouble Brewing Drunk's believed action is only logged as fake/no-effect. The Storyteller must manually ignore passive/day abilities and deliberately provide misinformation. Fortune Teller still has a one-target logger rather than a two-target chooser.
-- Drunk truth references calculate Chef pairs and Empath neighbours from current seating/alive state and list relevant recorded roles for Washerwoman, Librarian, and Investigator. They show Demon/Red Herring context for Fortune Teller and true target roles in the target menu for Ravenkeeper. Executions are not tracked, so Undertaker truth must be checked manually.
-- Only a small hard-coded subset of submitted night targets receives special death/log handling.
-- Night order entries beginning with `_` are always displayed as reminders; some BMR entries use non-character IDs without that prefix and may be omitted because they are not seat assignments.
-- Blood on the Clocktower role assignment can be manually changed outside the generated pool, and the app does not prevent duplicate unique roles.
-- The role-pool editor does not itself enforce that the pool size or type makeup matches the selected distribution.
-- Setup modifiers are text-only.
-- Traveller data is not connected to active play.
-- The app does not offer a complete nomination or vote-counting interface.
-- Ultimate Werewolf has no deck-building recommendations or automated team/role resolution.
-- Ultimate Werewolf night prompts accept one generic living target even when an ability needs no target, multiple targets, an adjacent target, a role/team choice, or a non-target response.
-- Manual resurrection is available even when no role permits it.
-- The chronicle records selected actions and manual status changes, not a complete audit of everything that occurred.
-- Saved sessions have no general schema-version migration. Trouble Brewing host handoff is a QR/JSON export of the current save; it is not implemented for other scripts.
-- Give Handoff stays locked until Night 1 has ended. First-night setup cannot be transferred this way.
-- Camera QR scanning depends on `BarcodeDetector`. Firefox and some older browsers should use JSON paste/upload, or Chrome/Edge/Safari.
-- Dense late-game QRs can be hard to scan; copy JSON or the emailed QR image if the on-screen code fails.
-- Some older standalone/reference files remain in the repository; [`index.html`](index.html) plus the active scripts and main stylesheet are authoritative for current behavior.
+- Many complex character effects are recorded as guided manual steps rather than applied to all downstream state.
+- Setup edits, roster edits, reveal navigation, and ordinary tab navigation are not Undo checkpoints.
+- Traveller records are available as reference data but are not part of the active setup flow.
+- Nominations and vote totals do not form a complete voting subsystem.
+- Ultimate Werewolf expects a physical deck and manual role-resolution decisions.
+- Camera QR decoding depends on browser support; link, JSON paste, and JSON upload are the portable fallbacks.
+- Large handoffs may require several QR scans. Copying the takeover link or JSON is usually faster.
+- A static GitHub Pages app cannot hold private mail credentials. Remote email therefore requires the optional operator-controlled HTTPS relay described above.
+- The handoff model is intentionally single-host and snapshot-based; it does not reconcile edits from two devices.
 
-## Contributing
+## Contribution notes
 
-### Keep data and engine behavior separate
-
-- Put game definitions, exact role IDs, ability text, inventory, and wake order in the appropriate script file.
-- Put shared UI, state transitions, persistence, and automation in `scripts/common.js`.
-- Treat role IDs as stable keys: they drive assignments, night filtering, saved sessions, and artwork filenames.
-- When adding a role, decide explicitly whether it belongs in the active `C` map or in data-only metadata such as `TRAVELLERS`.
-
-### Do not imply automation that is not implemented
-
-If documentation or UI says an effect occurs automatically, add and test the corresponding state transition. Otherwise describe it as a prompt, record, reminder, or manual moderator action. Role ability text alone does not mean the engine implements that ability.
-
-### Preserve compatibility
-
-- Keep `index.html` script order: game data, `handoff-qr.js`, `common.js`, then `handoff.js`.
-- Keep static hosting and relative paths working.
-- Consider existing saves before renaming IDs or changing state shapes.
-- Test with missing artwork so emoji fallbacks still work.
-- Avoid adding dependencies or a build requirement unless the benefit justifies changing the project's deployment model.
-
-### Suggested manual test pass
-
-1. Start each game and verify its player limits.
-2. Check every standard Blood on the Clocktower distribution from 5 through 15 players.
-3. Complete roster and role setup, including manual pool edits and assignments.
-4. For Blood on the Clocktower, complete every private reveal and both first/other-night transitions.
-5. For Ultimate Werewolf, assign cards up to their quantities and verify the next copy is disabled.
-6. Mark players dead/alive and confirm night filtering and voting reminders match the selected mode.
-7. Run, pause, extend, reset, and finish the timer.
-8. Declare winners and inspect the chronicle.
-9. Reload, resume, then reset and confirm the saved session is removed.
-10. Test both with and without role image files.
-11. For Trouble Brewing, finish Night 1, open Give Handoff, then restore that QR or JSON through Receive Handoff on a clean session. Confirm mid-night wake progress and poison restore. Confirm Give Handoff is unavailable during Night 1.
-
-When changing role data, compare the README role lists against every key in `TB_C`, `BMR_C`, `SV_C`, and `UW_C`, and compare Traveller sections against each `TRAVELLERS` object.
+- Keep character definitions, IDs, ability text, inventory, and night order in the matching game-data file.
+- Keep shared state transitions and rendering in `scripts/common.js`; put reusable rules, history, email, icon, and handoff behavior in their dedicated modules.
+- Treat character IDs and serialized field names as compatibility-sensitive keys.
+- If the UI claims that a rule consequence is applied directly, add the matching state transition and regression coverage. Otherwise present it as a prompt, record, reminder, or manual Storyteller decision.
+- Preserve relative paths and direct static hosting.
+- Consider existing saves and handoff versions before changing state shapes.
+- Run the full test command and a mobile portrait walkthrough before release.

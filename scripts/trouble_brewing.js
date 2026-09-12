@@ -6,8 +6,6 @@ const TB_DIST = {
   7:{t:5,o:0,m:1,d:1}, 8:{t:5,o:1,m:1,d:1}, 9:{t:5,o:2,m:1,d:1},
   10:{t:7,o:0,m:2,d:1}, 11:{t:7,o:1,m:2,d:1}, 12:{t:7,o:2,m:2,d:1},
   13:{t:9,o:0,m:3,d:1}, 14:{t:9,o:1,m:3,d:1}, 15:{t:9,o:2,m:3,d:1},
-  16:{t:11,o:0,m:4,d:1}, 17:{t:11,o:1,m:4,d:1}, 18:{t:11,o:2,m:4,d:1},
-  19:{t:13,o:0,m:5,d:1}, 20:{t:13,o:1,m:5,d:1},
 };
 
 const TB_C = {
@@ -67,26 +65,29 @@ const TB_C = {
     fn_r:"Show the Spy the Grimoire (your phone screen with all roles visible).",
     on_r:"Show the Spy the Grimoire."},
   scarletwoman:{id:"scarletwoman",name:"Scarlet Woman",team:"evil",type:"minion",fn:0,on:25,
-    ab:"If there are 5 or more players alive & the Demon dies, you become the Demon.",fn_r:"",
+    ab:"If there are 5 or more players alive & the Demon dies, you become the Demon. (Travellers don't count.)",fn_r:"",
     on_r:"ONLY if the Demon died today AND 5+ alive: wake Scarlet Woman. Show 'You are' then Imp token."},
   baron:{id:"baron",name:"Baron",team:"evil",type:"minion",fn:0,on:0,setup:true,
+    setupModifier:{townsfolkDelta:-2, outsiderDelta:2},
     ab:"There are extra Outsiders in play. [+2 Outsiders]",fn_r:"",on_r:""},
   imp:{id:"imp",name:"Imp",team:"evil",type:"demon",fn:0,on:30,
-    ab:"Each night*, choose a player: they die. If you kill yourself, a Minion becomes the Imp.",fn_r:"",
+    ab:"Each night*, choose a player: they die. If you kill yourself this way, a Minion becomes the Imp.",fn_r:"",
     on_r:"Imp points to a player — that player DIES. If Imp points to THEMSELVES: Imp dies, choose an alive Minion to become the new Imp."},
 };
 
 const TB_FIRST_NIGHT = [
-  {id:"_minioninfo",order:10,title:"🤝 Minion Info"},
-  {id:"_demoninfo",order:11,title:"😈 Demon Info"},
-  {id:"poisoner",order:17},{id:"spy",order:18},
+  {id:"_minioninfo",order:10,title:"Minion Info"},
+  {id:"_demoninfo",order:11,title:"Demon Info"},
+  {id:"poisoner",order:17},
   {id:"washerwoman",order:33},{id:"librarian",order:34},{id:"investigator",order:35},
   {id:"chef",order:36},{id:"empath",order:37},{id:"fortuneteller",order:38},{id:"butler",order:39},
+  {id:"spy",order:40},
 ];
 const TB_OTHER_NIGHT = [
-  {id:"poisoner",order:7},{id:"monk",order:21},{id:"spy",order:22},
-  {id:"scarletwoman",order:25},{id:"imp",order:30},{id:"ravenkeeper",order:46},
-  {id:"undertaker",order:51},{id:"empath",order:52},{id:"fortuneteller",order:53},{id:"butler",order:54},
+  {id:"poisoner",order:7},{id:"monk",order:21},
+  {id:"imp",order:30},{id:"ravenkeeper",order:46},
+  {id:"empath",order:51},{id:"fortuneteller",order:52},{id:"undertaker",order:53},{id:"butler",order:54},
+  {id:"spy",order:55},
 ];
 
 // Travellers for Trouble Brewing
@@ -121,7 +122,6 @@ const TB_TRAVELLERS = {
 const TB = {
   id: "tb",
   name: "Trouble Brewing",
-  emoji: "🩸",
   color: "#e74c3c",
   tagline: "Recommended for new players",
   desc: "13 Townsfolk • 4 Outsiders • 4 Minions • Imp",
@@ -132,5 +132,6 @@ const TB = {
   demonFixed: true,       // Imp is the only demon
   defaultDemon: ["imp"],
   hasDrunk: true,         // Needs Drunk-believes-as picker
+  playerLimits: { min: 5, max: 15 },
   TRAVELLERS: TB_TRAVELLERS,
 };

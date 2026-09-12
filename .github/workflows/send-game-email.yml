@@ -1,0 +1,241 @@
+name: Send game email
+
+on:
+  repository_dispatch:
+    types: [send-game-email]
+
+permissions: {}
+
+concurrency:
+  group: game-email-${{ github.event.client_payload.idempotencyKey || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.12.0"
+
+      - name: Install pinned email dependencies
+        run: >-
+          npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund
+          nodemailer@10.0.9 qrcode@1.5.4 sanitize-html@2.17.7
+
+      - name: Validate and send email
+        env:
+          SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+          const nodemailer = require("nodemailer");
+          const QRCode = require("qrcode");
+          const sanitizeHtml = require("sanitize-html");
+
+          const LIMITS = Object.freeze({
+            dispatchChars: 60000,
+            subjectChars: 180,
+            htmlChars: 48000,
+            textChars: 30000,
+            idempotencyChars: 80,
+            handoverParts: 12,
+            handoverUrlBytes: 2200,
+            handoverTotalChars: 12000,
+            generatedAttachmentBytes: 2 * 1024 * 1024
+          });
+          const supportedTypes = new Set(["game-start", "night-complete", "game-end"]);
+          const PAYLOAD_KEYS = new Set([
+            "eventType", "subject", "html", "text", "idempotencyKey", "handoverUrl", "handoverUrls"
+          ]);
+
+          function isPlainObject(value) {
+            if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+            const prototype = Object.getPrototypeOf(value);
+            return prototype === Object.prototype || prototype === null;
+          }
+
+          function requireString(value, label, { minimum = 0, maximum } = {}) {
+            if (typeof value !== "string") throw new TypeError(`${label} must be a string.`);
+            if (value.length < minimum || (maximum !== undefined && value.length > maximum)) {
+              throw new RangeError(`${label} has an invalid length.`);
+            }
+            return value;
+          }
+
+          function normalizeEmailAddress(value, label) {
+            const address = requireString(value, label, { minimum: 3, maximum: 254 }).trim();
+            if (/\s|[\r\n]/.test(address) || !/^[^@]+@[^@]+\.[^@]+$/.test(address)) {
+              throw new TypeError(`${label} must contain one valid email address.`);
+            }
+            return address;
+          }
+
+          function normalizeHandoverUrls(payload) {
+            if (payload.handoverUrl !== undefined && payload.handoverUrls !== undefined) {
+              throw new TypeError("Use handoverUrls instead of sending both handover URL fields.");
+            }
+            let source = payload.handoverUrls;
+            if (source === undefined) {
+              if (payload.handoverUrl === undefined || payload.handoverUrl === "") return [];
+              source = [payload.handoverUrl];
+            }
+            if (!Array.isArray(source)) throw new TypeError("handoverUrls must be an array.");
+            if (source.length > LIMITS.handoverParts) throw new RangeError("Too many handover QR parts.");
+
+            const urls = [];
+            const seen = new Set();
+            for (const value of source) {
+              const url = requireString(value, "Handover URL", { minimum: 1, maximum: LIMITS.handoverUrlBytes });
+              if (Buffer.byteLength(url, "utf8") > LIMITS.handoverUrlBytes) {
+                throw new RangeError("A handover URL is too large for a reliable QR code.");
+              }
+              const parsed = new URL(url);
+              if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) {
+                throw new TypeError("A handover URL is invalid.");
+              }
+              if (seen.has(parsed.href)) throw new TypeError("Duplicate handover URLs are not allowed.");
+              seen.add(parsed.href);
+              urls.push(parsed.href);
+            }
+            if (urls.reduce((total, url) => total + url.length, 0) > LIMITS.handoverTotalChars) {
+              throw new RangeError("The handover QR parts exceed the delivery limit.");
+            }
+            return urls;
+          }
+
+          function validateCidReferences(html, urls) {
+            const expected = urls.map((_url, index) => urls.length === 1 ? "handover-qr" : `handover-qr-${index + 1}`);
+            const actual = [...html.matchAll(/cid:([A-Za-z0-9._-]+)/g)].map(match => match[1]);
+            if (actual.length !== expected.length || actual.some((cid, index) => cid !== expected[index])) {
+              throw new TypeError("Handover QR references do not match the supplied URLs.");
+            }
+            return expected;
+          }
+
+          function validateEmailStyles(rawHtml) {
+            const forbidden = /(?:javascript\s*:|expression\s*\(|url\s*\(|@import\b|-moz-binding\b|behavior\s*:)/i;
+            const pattern = /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')|<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+            for (const match of rawHtml.matchAll(pattern)) {
+              if (forbidden.test(match[1] || match[2] || match[3] || "")) {
+                throw new TypeError("html contains a disallowed style construct.");
+              }
+            }
+          }
+
+          function sanitizeEmailHtml(rawHtml) {
+            if (!/^<!doctype html>/i.test(rawHtml) || !/<html\b[\s\S]*<\/html>\s*$/i.test(rawHtml)) {
+              throw new TypeError("html must be a complete HTML document.");
+            }
+            validateEmailStyles(rawHtml);
+
+            const sanitizedBody = sanitizeHtml(rawHtml, {
+              allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+                "html", "head", "body", "meta", "style", "table", "tbody", "thead", "tfoot",
+                "tr", "td", "th", "pre", "img"
+              ]),
+              allowedAttributes: {
+                "*": ["class", "style", "role", "width", "height", "align", "valign"],
+                a: ["href", "style"],
+                img: ["src", "alt", "width", "height", "style"],
+                meta: ["name", "content", "charset"]
+              },
+              allowedSchemes: ["http", "https", "cid"],
+              allowedSchemesByTag: { img: ["cid"], a: ["http", "https"] },
+              allowProtocolRelative: false,
+              disallowedTagsMode: "discard"
+            }).trim();
+            const html = /^<!doctype html>/i.test(sanitizedBody)
+              ? sanitizedBody
+              : `<!doctype html>\n${sanitizedBody}`;
+            if (!/<html\b[\s\S]*<\/html>\s*$/i.test(html)) {
+              throw new TypeError("Sanitization did not produce a complete HTML document.");
+            }
+            return html;
+          }
+
+          (async () => {
+            const smtpEmail = normalizeEmailAddress(String(process.env.SMTP_EMAIL || "").trim(), "SMTP_EMAIL");
+            const smtpPassword = requireString(
+              String(process.env.SMTP_APP_PASSWORD || "").replace(/\s+/g, ""),
+              "SMTP_APP_PASSWORD",
+              { minimum: 8, maximum: 512 }
+            );
+            const emailTo = normalizeEmailAddress(String(process.env.EMAIL_TO || "").trim(), "EMAIL_TO");
+
+            const eventText = fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8");
+            const event = JSON.parse(eventText);
+            const payload = event.client_payload;
+            if (!isPlainObject(payload)) throw new TypeError("client_payload must be an object.");
+            if (JSON.stringify(payload).length > LIMITS.dispatchChars) {
+              throw new RangeError("client_payload exceeds the safe delivery limit.");
+            }
+            for (const key of Object.keys(payload)) {
+              if (!PAYLOAD_KEYS.has(key)) throw new TypeError(`Unsupported client_payload field: ${key}.`);
+            }
+            if (!supportedTypes.has(payload.eventType)) throw new TypeError("Unsupported email event type.");
+
+            const subject = requireString(payload.subject, "subject", { minimum: 1, maximum: LIMITS.subjectChars }).trim();
+            if (!subject || /[\r\n]/.test(subject)) throw new TypeError("subject contains an invalid line break.");
+            const text = requireString(payload.text, "text", { minimum: 1, maximum: LIMITS.textChars });
+            const rawHtml = requireString(payload.html, "html", { minimum: 1, maximum: LIMITS.htmlChars });
+            const idempotencyKey = requireString(
+              payload.idempotencyKey,
+              "idempotencyKey",
+              { minimum: 1, maximum: LIMITS.idempotencyChars }
+            );
+            if (!/^botc-(?:game-start|night-complete|game-end)-[0-9a-f]{16}$/.test(idempotencyKey)) {
+              throw new TypeError("idempotencyKey has an invalid format.");
+            }
+
+            const handoverUrls = normalizeHandoverUrls(payload);
+            const expectedCids = validateCidReferences(rawHtml, handoverUrls);
+            const html = sanitizeEmailHtml(rawHtml);
+            validateCidReferences(html, handoverUrls);
+
+            const attachments = await Promise.all(handoverUrls.map(async (url, index) => {
+              const content = await QRCode.toBuffer(url, {
+                errorCorrectionLevel: "M",
+                type: "png",
+                margin: 1,
+                width: 440
+              });
+              if (!Buffer.isBuffer(content) || content.length > LIMITS.generatedAttachmentBytes) {
+                throw new RangeError("A generated handover QR attachment is invalid.");
+              }
+              return {
+                filename: handoverUrls.length === 1
+                  ? "handover-qr.png"
+                  : `handover-qr-${index + 1}-of-${handoverUrls.length}.png`,
+                content,
+                contentType: "image/png",
+                cid: expectedCids[index]
+              };
+            }));
+
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              requireTLS: true,
+              auth: { user: smtpEmail, pass: smtpPassword },
+              tls: { minVersion: "TLSv1.2" }
+            });
+            await transporter.sendMail({
+              from: smtpEmail,
+              to: emailTo,
+              subject,
+              text,
+              html,
+              attachments,
+              disableFileAccess: true,
+              disableUrlAccess: true
+            });
+            console.log(`Sent ${payload.eventType} message (${idempotencyKey}).`);
+          })().catch(error => {
+            console.error(error instanceof Error ? error.message : "Email delivery failed.");
+            process.exit(1);
+          });
+          EOF

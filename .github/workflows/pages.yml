@@ -19,51 +19,61 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Inject runtime config from secrets
-        env:
-          ROSTER_DISPATCH_TOKEN: ${{ secrets.ROSTER_DISPATCH_TOKEN }}
-          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      - name: Verify JavaScript and tests
+        shell: bash
         run: |
-          python3 - <<'PY'
-          import os
-          import sys
+          set -euo pipefail
+          for file in scripts/*.js; do
+            node --check "$file"
+          done
+          node --test tests/*.test.js
 
-          def escape_js(value: str) -> str:
-              return value.replace("\\", "\\\\").replace('"', '\\"')
-
-          token = os.environ.get("ROSTER_DISPATCH_TOKEN", "").strip()
-          gemini_key = os.environ.get("GEMINI_KEY", "").strip()
-          if not token:
-              print("ROSTER_DISPATCH_TOKEN secret is missing or empty.", file=sys.stderr)
-              sys.exit(1)
-          if not gemini_key:
-              print("GEMINI_KEY secret is missing or empty.", file=sys.stderr)
-              sys.exit(1)
-
-          content = f'''window.ROSTER_DISPATCH_CONFIG = {{
-            owner: "AkshDesai04",
-            repo: "BOTC_Master",
-            token: "{escape_js(token)}",
-            geminiApiKey: "{escape_js(gemini_key)}"
-          }};
-          '''
-          with open("scripts/runtime-config.js", "w", encoding="utf-8") as handle:
-              handle.write(content)
-          print(
-              "Injected runtime config (dispatch token length=%d, gemini key length=%d)."
-              % (len(token), len(gemini_key))
-          )
-          PY
+      - name: Assemble static site
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d _site/scripts _site/styles _site/assets/images
+          cp index.html trouble_brewing.html bad_moon_rising.html sects_and_violets.html _site/
+          cp styles/main.css _site/styles/
+          cp \
+            scripts/runtime-config.js \
+            scripts/icons.js \
+            scripts/history.js \
+            scripts/game-rules.js \
+            scripts/email.js \
+            scripts/trouble_brewing.js \
+            scripts/bad_moon_rising.js \
+            scripts/sects_and_violets.js \
+            scripts/ultimate_werewolf.js \
+            scripts/handoff-qr.js \
+            scripts/common.js \
+            scripts/handoff.js \
+            _site/scripts/
+          while IFS= read -r -d '' file; do
+            install -D "$file" "_site/$file"
+          done < <(find assets/images -type f -name '*.png' -print0)
+          test ! -e _site/old_code_for_reference.html
+          test ! -e _site/tests
+          test ! -e _site/assets/handoff-previews
+          test ! -e _site/README.md
+          test ! -e _site/PLAN.md
+          test ! -e _site/scripts/runtime-config.example.js
+          test ! -e _site/.git
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
-          path: .
+          path: _site
 
   deploy:
     needs: build
@@ -74,4 +84,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

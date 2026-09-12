@@ -1,15 +1,16 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-<script>
-  try {
-    let saved = localStorage.getItem("botc_storyteller_v2");
-    let state = saved ? JSON.parse(saved) : {};
-    state.scriptId = "bmr";
-    state.screen = "count";
-    localStorage.setItem("botc_storyteller_v2", JSON.stringify(state));
-  } catch(e) {}
-  window.location.replace("index.html");
-</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Open Bad Moon Rising</title>
 </head>
+<body>
+  <p><a href="index.html?script=bmr">Open Bad Moon Rising</a></p>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    params.set("script", "bmr");
+    window.location.replace(`index.html?${params.toString()}${window.location.hash}`);
+  </script>
+</body>
 </html>
