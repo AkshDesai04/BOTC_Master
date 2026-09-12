@@ -1037,6 +1037,11 @@ test("Fang Gu jumps only when its functioning ability can kill a living Outsider
   assert.equal(jump("playerAlignment(1)"), "evil");
   assert.equal(jump("state.permanentlyPoisoned[1]"), true);
 
+  jump("changePlayerCharacter(0, 'clockmaker')");
+  assert.equal(jump("state.assignments[0]"), "clockmaker");
+  assert.equal(jump("Object.values(state.assignments).filter(roleId => roleId === 'fanggu').length"), 1);
+  assert.equal(jump("state.fangGuJumpUsed"), true);
+
   for (const impairedOrProtected of ["impaired", "protected"]) {
     const blocked = createHarness();
     blocked(`

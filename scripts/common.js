@@ -208,6 +208,10 @@ let state = {
   toast: null,            // non-blocking toast { message, tone }
 };
 
+const DIALOG_SELECTOR = '[role="alertdialog"], [role="dialog"]';
+const FOCUSABLE_SELECTOR = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+let dialogFocusOrigin = null;
+
 const historyController = window.BOTCHistory?.createHistoryController({
   limit: 30,
   getState: () => state,
@@ -599,9 +603,82 @@ function resumeGame() {
 // ══════════════════════════════════════════════════════════════════════════
 // RENDER ROUTINE
 // ══════════════════════════════════════════════════════════════════════════
+function findNonDrawerDialog(root) {
+  const dialogs = root?.querySelectorAll?.(DIALOG_SELECTOR) ?? [];
+  return [...dialogs].find(dialog => !dialog.classList?.contains?.("drawer-menu")) ?? null;
+}
+
+function hasNonDrawerDialogState() {
+  return Boolean(state.showCard || state.confirm || state.showWinnerPicker || state.showResume || state.showHandoffGive);
+}
+
+function normalizedFocusText(element) {
+  return String(element?.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
+function focusAttribute(element, name) {
+  return String(element?.getAttribute?.(name) ?? "");
+}
+
+function rememberDialogFocus(root) {
+  const activeElement = document.activeElement;
+  if (!activeElement || activeElement === document.body) return;
+  if (typeof root?.contains === "function" && !root.contains(activeElement)) return;
+
+  const signature = {
+    id: String(activeElement.id ?? ""),
+    tagName: String(activeElement.tagName ?? "").toLowerCase(),
+    ariaLabel: focusAttribute(activeElement, "aria-label"),
+    action: focusAttribute(activeElement, "onclick") || focusAttribute(activeElement, "onchange"),
+    name: focusAttribute(activeElement, "name"),
+    value: String(activeElement.value ?? ""),
+    text: normalizedFocusText(activeElement)
+  };
+  if (signature.id || signature.ariaLabel || signature.action || signature.name || signature.text) {
+    dialogFocusOrigin = signature;
+  }
+}
+
+function restoreDialogFocus(root) {
+  const signature = dialogFocusOrigin;
+  dialogFocusOrigin = null;
+  if (!signature) return;
+
+  const belongsToRoot = element => element && (typeof root?.contains !== "function" || root.contains(element));
+  let target = signature.id ? document.getElementById(signature.id) : null;
+  if (!belongsToRoot(target)) target = null;
+
+  const candidates = [...(root?.querySelectorAll?.(FOCUSABLE_SELECTOR) ?? [])];
+  if (!target && signature.ariaLabel) {
+    target = candidates.find(element => focusAttribute(element, "aria-label") === signature.ariaLabel) ?? null;
+  }
+  if (!target && signature.action) {
+    target = candidates.find(element => (
+      (focusAttribute(element, "onclick") || focusAttribute(element, "onchange")) === signature.action
+      && String(element.tagName ?? "").toLowerCase() === signature.tagName
+    )) ?? null;
+  }
+  if (!target && signature.name) {
+    target = candidates.find(element => (
+      focusAttribute(element, "name") === signature.name
+      && String(element.value ?? "") === signature.value
+    )) ?? null;
+  }
+  if (!target && signature.text) {
+    target = candidates.find(element => (
+      normalizedFocusText(element) === signature.text
+      && String(element.tagName ?? "").toLowerCase() === signature.tagName
+    )) ?? null;
+  }
+  if (!target) target = candidates[0] ?? null;
+  target?.focus?.();
+}
+
 function render() {
   const app = document.getElementById("app");
   if (!app) return;
+  const hadNonDrawerDialog = Boolean(findNonDrawerDialog(app));
+  if (!hadNonDrawerDialog && hasNonDrawerDialogState() && !dialogFocusOrigin) rememberDialogFocus(app);
   if (state.screen !== "handoffReceive" && typeof handoffRuntime !== "undefined" && handoffRuntime.stream) {
     stopHandoffScanner();
   }
@@ -630,13 +707,16 @@ function render() {
   }
   app.innerHTML = html;
 
-  const activeDialog = app.querySelector?.('[role="alertdialog"], [role="dialog"]');
+  const activeDialog = app.querySelector?.(DIALOG_SELECTOR);
+  const hasNonDrawerDialog = Boolean(findNonDrawerDialog(app));
   if (activeDialog) {
-    const firstControl = activeDialog.querySelector?.(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
-    );
+    const firstControl = activeDialog.querySelector?.(FOCUSABLE_SELECTOR);
     if (typeof firstControl?.focus === "function") firstControl.focus();
     else if (typeof activeDialog.focus === "function") activeDialog.focus();
+  }
+  if (hadNonDrawerDialog && !hasNonDrawerDialog) {
+    if (state.drawerOpen) dialogFocusOrigin = null;
+    else restoreDialogFocus(app);
   }
 
   // Roster input focus helper

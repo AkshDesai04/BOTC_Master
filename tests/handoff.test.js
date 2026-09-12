@@ -205,6 +205,48 @@ function dynamicSnapshotFor(scriptId) {
   throw new Error(`No dynamic handoff fixture exists for ${scriptId}.`);
 }
 
+function fangGuJumpAfterCharacterChangeSnapshot() {
+  const source = dynamicSnapshotFor("sv");
+  source.game.rolePool = ["philosopher", "vigormortis", "witch", "barber", "fanggu"];
+  source.game.assignments = {
+    0: "philosopher",
+    1: "vigormortis",
+    2: "witch",
+    3: "barber",
+    4: "fanggu"
+  };
+  source.game.dist = { t: 1, o: 1, m: 1, d: 2 };
+  source.game.alive = { 0: true, 1: true, 2: false, 3: false, 4: true };
+  source.game.alignments = { 0: "evil", 1: "evil", 2: "evil", 3: "evil", 4: "evil" };
+  source.game.deathsLastNight = [3];
+  source.game.nightLog = [{
+    roleId: "fanggu",
+    sourceId: null,
+    targetIndexes: [4],
+    characterId: null,
+    actingPlayerIndex: 3,
+    fakeNoEffect: false,
+    manualResolution: false,
+    nightNumber: 3,
+    stepIndex: 4
+  }];
+  source.game.chronicle = [{
+    type: "night",
+    nightNum: 3,
+    title: "Fang Gu Action",
+    details: "The first Outsider jump was applied: Eli is now an evil Fang Gu and Dara dies instead.",
+    badgeColor: "var(--red)"
+  }, {
+    type: "night",
+    nightNum: 3,
+    title: "Character Changed",
+    details: "Dara changed from Fang Gu to Barber.",
+    badgeColor: "var(--green)"
+  }];
+  source.game.fangGuJumpUsed = true;
+  return source;
+}
+
 function assertCode(error, expectedCode) {
   assert.equal(error?.code, expectedCode);
   return true;
@@ -318,6 +360,45 @@ test("Sects & Violets role-dependent state survives a typed handoff round-trip",
     4: false
   });
   assert.equal(restored.game.fangGuJumpUsed, true);
+});
+
+test("Fang Gu jump use survives a later character change through round-trip and takeover", async () => {
+  const source = fangGuJumpAfterCharacterChangeSnapshot();
+  const options = dynamicCodecOptions({ compress: false });
+  assert.equal(Object.values(source.game.assignments).filter(roleId => roleId === "fanggu").length, 1);
+
+  const payload = await handoff.encodeHandoffPayload(source, options);
+  const restored = await handoff.decodeHandoffPayload(payload, options);
+  assert.equal(restored.game.fangGuJumpUsed, true);
+  assert.equal(restored.game.assignments[3], "barber");
+  assert.equal(restored.game.assignments[4], "fanggu");
+
+  const takeover = handoff.createTakeoverState(
+    { scriptId: "sv", fangGuJumpUsed: false },
+    restored,
+    dynamicCodecOptions()
+  );
+  assert.equal(takeover.fangGuJumpUsed, true);
+  assert.equal(takeover.assignments[3], "barber");
+  assert.equal(takeover.assignments[4], "fanggu");
+});
+
+test("Fang Gu jump use is rejected when no eligible game state supports it", () => {
+  const withoutFangGu = fangGuJumpAfterCharacterChangeSnapshot();
+  withoutFangGu.game.rolePool[4] = "barber";
+  withoutFangGu.game.assignments[4] = "barber";
+  const sanitized = handoff.sanitizeHandoffSnapshot(withoutFangGu, dynamicCodecOptions());
+  assert.equal(sanitized.game.fangGuJumpUsed, false);
+
+  const wrongScript = snapshotFor("bmr");
+  wrongScript.game.fangGuJumpUsed = true;
+  assert.equal(handoff.sanitizeHandoffSnapshot(wrongScript, codecOptions()).game.fangGuJumpUsed, false);
+
+  withoutFangGu.game.fangGuJumpUsed = "true";
+  assert.throws(
+    () => handoff.sanitizeHandoffSnapshot(withoutFangGu, dynamicCodecOptions()),
+    error => assertCode(error, "invalid-boolean")
+  );
 });
 
 test("role-dependent fields reject malformed handoff data with stable errors", () => {

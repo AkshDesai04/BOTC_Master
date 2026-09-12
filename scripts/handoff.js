@@ -1240,6 +1240,7 @@
       && ["townsfolk", "outsider"].includes(characters[roleId]?.type)
     )));
     const fangGuCount = Object.values(assignments).filter(roleId => roleId === "fanggu").length;
+    const rawFangGuJumpUsed = booleanValue(game.fangGuJumpUsed, "game.fangGuJumpUsed", false);
     const rawLunaticBeliefs = sanitizeRoleMap(game.lunaticBelievedRoles, playerCount, characters, "game.lunaticBelievedRoles");
     const lunaticBelievedRoles = Object.fromEntries(Object.entries(rawLunaticBeliefs).filter(([seat, roleId]) => (
       scriptId === "bmr" && assignments[seat] === "lunatic" && characters?.[roleId]?.type === "demon"
@@ -1296,7 +1297,7 @@
       courtierEffect: sanitizeCourtierEffect(game.courtierEffect, characters, scriptId),
       permanentlyPoisoned,
       gainedAbilities,
-      fangGuJumpUsed: scriptId === "sv" && fangGuCount > 1 && booleanValue(game.fangGuJumpUsed, "game.fangGuJumpUsed", false),
+      fangGuJumpUsed: scriptId === "sv" && fangGuCount > 0 && rawFangGuJumpUsed,
       chronicle: sanitizeChronicle(game.chronicle),
       winTeam,
       winnerSelection: sanitizeWinnerSelection(game.winnerSelection),

@@ -256,6 +256,15 @@ test("timer ticks update stable clock elements without a full render", () => {
   assert.notEqual(harness.elements.get("discussion-timer-progress").style.strokeDashoffset, "");
   assert.equal(toggle.innerHTMLWrites, 0);
 
+  for (let second = 1; second < 60; second++) {
+    harness.evaluate("state.timerDeadline -= 1000");
+    tick();
+  }
+  assert.equal(harness.evaluate("state.timerSeconds"), 240);
+  assert.equal(harness.elements.get("discussion-timer-display").textContent, "4:00");
+  assert.equal(harness.evaluate("globalThis.renderCount"), rendersAfterStart);
+  assert.equal(toggle.innerHTMLWrites, 0);
+
   harness.evaluate("toggleTimerRunning(); updateTimerDisplay();");
   assert.equal(toggle.dataset.timerState, "paused");
   assert.equal(toggle.innerHTMLWrites, 1);
